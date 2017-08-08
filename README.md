@@ -1,6 +1,7 @@
 # InfoSec_Tools
-collection of cool tools
+Collection of useful tools for OffSec&DefSec
 
-## https://github.com/BornToBeRoot/PowerShell
+## BornToBeRoot Repos
+https://github.com/BornToBeRoot/PowerShell
 * https://github.com/BornToBeRoot/PowerShell_IPv4NetworkScanner
 * https://github.com/BornToBeRoot/PowerShell
