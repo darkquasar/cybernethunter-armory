@@ -7,8 +7,7 @@
 			"Example": "Get-ItemProperty \"HKLM:SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\"",
 			"Links": "https://technet.microsoft.com/en-us/library/ee176852.aspx"
 		}
-	
-	
+		
 	}
 
 }
