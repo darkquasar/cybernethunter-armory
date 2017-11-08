@@ -4,7 +4,7 @@
 		"Commands": {
 			"Name": "Get-ItemProperty",
 			"Summary": "get the value of a registry key",
-			"Example": "Get-ItemProperty \"HKLM:SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest\"",
+			"Example": "Get-ItemProperty \"HKLM:SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\WDigest\"",
 			"Links": "https://technet.microsoft.com/en-us/library/ee176852.aspx"
 		}
 	
