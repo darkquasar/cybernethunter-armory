@@ -3,13 +3,13 @@
     {
 		"type": "vmware-vmx",
 		"headless": true,
-		"source_path": "./output-vmware-iso/packer-vmware-iso.vmx",
+		"source_path": "{{user `source_path`}}",
 		"boot_wait": "1s",
 		"communicator": "winrm",
 		"winrm_username": "vagrant",
 		"winrm_password": "vagrant",
 		"winrm_timeout": "12h",
-		"output_directory": "P:\\vmware-vmx-test",
+		"output_directory": "{{user `output_directory`}}",
 		"shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
 		"shutdown_timeout": "1h",
 		"skip_compaction": "true",
@@ -66,6 +66,7 @@
 			"Get-Job"
 		],
 		"environment_vars": [
+		"cybersec_tools_folder={{user `cybersec_tools_folder`}}",
         "install_notepadpp={{user `install_notepadpp`}}",
 		"install_openssh={{user `install_openssh`}}",
 		"install_flarevm={{user `install_flarevm`}}",
