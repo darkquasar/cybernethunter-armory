@@ -1,0 +1,21 @@
+{
+	"output_directory": "./",
+	"source_path": "./",
+	"iso_url": "",
+	"iso_checksum_type": "md5",
+	"iso_checksum": "",
+	"guest_os_type": "",
+	"autounattend": "",
+	"cybersec_tools_folder": "C:\\Tools",
+	"install_windowsupdates": "False",
+	"install_vmware_tools": "True",
+	"install_notepadpp": "True",
+	"install_putty": "True",
+	"install_openssh": "True",
+	"install_flarevm": "False",
+	"install_boxstarter": "True",
+	"install_firefox": "True",
+	"install_chrome": "True",
+	"install_torbrowser": "False",
+	"install_sysinternals": "True"
+}

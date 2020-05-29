@@ -1,4 +1,18 @@
-# a class for multiple output options for RedLine Collections
+#!/usr/bin/env python3
+
+'''
+ VERSION: 0.1
+ AUTHOR: Diego Perez (@darkquasar) - 2018
+ DESCRIPTION: A class for multiple output options for Fireye RedLine Collections
+ 
+ Updates: 
+    v0.1: ---.
+    
+ ToDo:
+    1. ----.
+'''
+
+# 
 
 class Output(object):
 	def __init__(self, outfilepointer, Xdict2, out_type, hostname):

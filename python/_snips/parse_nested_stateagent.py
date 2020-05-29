@@ -1,5 +1,13 @@
 '''
-This snip parses agent XML assigning the proper values ('hostname' instead of {'name':'hostname'})
+ VERSION: 0.1
+ AUTHOR: Diego Perez (@darkquasar) - 2018
+ DESCRIPTION: This snip parses agent XML assigning the proper values ('hostname' instead of {'name':'hostname'})
+ 
+ Updates: 
+    v0.1: ---.
+ ToDo:
+    1. ----.
+
 '''
 
 def recurse_nodes_test_worked(self, xmltree, new_elem=None):

@@ -1,0 +1,50 @@
+{
+  "builders": [
+    {
+		"type": "vmware-iso",
+		"iso_url": "{{user `iso_url`}}",
+		"iso_checksum_type": "{{user `iso_checksum_type`}}",
+		"iso_checksum": "{{user `iso_checksum`}}",
+		"headless": true,
+		"boot_wait": "1s",
+		"communicator": "winrm",
+		"winrm_username": "vagrant",
+		"winrm_password": "vagrant",
+		"winrm_timeout": "12h",
+		"shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
+		"shutdown_timeout": "1h",
+		"guest_os_type": "{{user `guest_os_type`}}",
+		"skip_compaction": "true",
+		"disk_size": 30000,
+		"vnc_port_min": 5900,
+		"vnc_port_max": 5980,
+		"floppy_files": [
+			"{{user `autounattend`}}",
+			"./scripts/winrm.ps1"
+		],
+		"vmx_data": {
+			"RemoteDisplay.vnc.enabled": "false",
+			"RemoteDisplay.vnc.port": "5900",
+			"memsize": "2048",
+			"numvcpus": "2",
+			"scsi0.virtualDev": "lsisas1068"
+      }
+    }
+  ],
+  "provisioners": [
+    {
+		"type": "powershell",
+		"elevated_user": "vagrant",
+		"elevated_password": "vagrant",
+		"inline": [
+			"Get-Process"
+      ]
+    }
+  ],
+  "variables": {
+	"iso_url": "C:\\VirtualMachines\\ISO\\9600.17050.W2012R2.ISO",
+	"iso_checksum_type": "sha256",
+	"iso_checksum": "6612B5B1F53E845AACDF96E974BB119A3D9B4DCB5B82E65804AB7E534DC7B4D5",
+	"autounattend": "./scripts/Autounattend.xml"
+  }
+}
