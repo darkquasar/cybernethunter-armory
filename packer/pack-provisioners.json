@@ -1,41 +1,9 @@
 {
-  "builders": [
-    {
-        "type": "vmware-vmx",
-        "headless": true,
-        "source_path": "{{user `source_path`}}",
-        "boot_wait": "1s",
-        "communicator": "winrm",
-        "winrm_username": "vagrant",
-        "winrm_password": "vagrant",
-        "winrm_timeout": "12h",
-        "output_directory": "{{user `output_directory`}}",
-        "shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
-        "shutdown_timeout": "1h",
-        "skip_compaction": "true",
-        "vnc_port_min": 5900,
-        "vnc_port_max": 5980,
-        "floppy_files": [
-            "{{user `autounattend`}}",
-            "./scripts/winrm.ps1",
-            "./scripts/THL-Provisioner-01.ps1"
-        ],
-        "vmx_data": {
-            "RemoteDisplay.vnc.enabled": "false",
-            "RemoteDisplay.vnc.port": "5900",
-            "memsize": "2048",
-            "numvcpus": "2",
-            "scsi0.virtualDev": "lsisas1068"
-      }
-    }
-  ],
-  "provisioners": [
-    {
-        "type": "file",
-        "source": "./Power/",
-        "destination": "C:/Users/Vagrant"
+    "restart": {
+        "type": "windows-restart",
+        "restart_timeout": "1h"
     },
-    {
+    "prepare": {
         "type": "powershell",
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
@@ -49,15 +17,11 @@
             "Start-Job -Name InstallChocolatey -ScriptBlock { . A:\\THL-Provisioner-01.ps1 ; Install-Chocolatey } | Wait-Job | Receive-Job -Wait"
         ],
         "environment_vars": [
-        "install_vmware_tools={{user `install_vmware_tools`}}",
-        "cybersec_tools_folder={{user `cybersec_tools_folder`}}"
+            "install_vmware_tools={{user `install_vmware_tools`}}",
+            "cybersec_tools_folder={{user `cybersec_tools_folder`}}"
         ]
     },
-    {
-            "type": "windows-restart",
-            "restart_timeout": "1h"
-    },
-    {
+    "process": {
         "type": "powershell",
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
@@ -66,47 +30,16 @@
             "Get-Job"
         ],
         "environment_vars": [
-        "cybersec_tools_folder={{user `cybersec_tools_folder`}}",
-        "install_notepadpp={{user `install_notepadpp`}}",
-        "install_openssh={{user `install_openssh`}}",
-        "install_flarevm={{user `install_flarevm`}}",
-        "install_boxstarter={{user `install_boxstarter`}}",
-        "install_firefox={{user `install_firefox`}}",
-        "install_chrome={{user `install_chrome`}}",
-        "install_torbrowser={{user `install_torbrowser`}}",
-        "install_sysinternals={{user `install_sysinternals`}}"
+            "cybersec_tools_folder={{user `cybersec_tools_folder`}}",
+            "install_notepadpp={{user `install_notepadpp`}}",
+            "install_openssh={{user `install_openssh`}}",
+            "install_flarevm={{user `install_flarevm`}}",
+            "install_boxstarter={{user `install_boxstarter`}}",
+            "install_firefox={{user `install_firefox`}}",
+            "install_chrome={{user `install_chrome`}}",
+            "install_torbrowser={{user `install_torbrowser`}}",
+            "install_sysinternals={{user `install_sysinternals`}}"
         ]
     },
-    {
-            "type": "windows-restart",
-            "restart_timeout": "1h"
-    },
-    {
-        "type": "powershell",
-        "elevated_user": "vagrant",
-        "elevated_password": "vagrant",
-        "inline": [
-            ". C:/Users/Vagrant/THL-Provisioner-01.ps1 ; Install-FlareVM",
-            "Start-Job -Name CleanUp -ScriptBlock { . C:/Users/vagrant/THL-Provisioner-01.ps1 ; Configure-Generics-End } | Wait-Job | Receive-Job -Wait",
-            "Get-Job"
-        ],
-        "environment_vars": [
-        "install_flarevm={{user `install_flarevm`}}"
-        ]
-    }
-  ],
-  "variables": {
-    "autounattend": "./scripts/Autounattend.xml",
-    "cybersec_tools_folder": "C:\\Tools",
-    "install_vmware_tools": "True",
-    "install_notepadpp": "True",
-    "install_putty": "True",
-    "install_openssh": "True",
-    "install_flarevm": "False",
-    "install_boxstarter": "True",
-    "install_firefox": "True",
-    "install_chrome": "True",
-    "install_torbrowser": "False",
-    "install_sysinternals": "True"
-  }
+    "cleanup": {}
 }

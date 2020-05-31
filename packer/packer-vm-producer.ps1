@@ -51,65 +51,19 @@ function Start-BuildPackerTemplate {
         [Parameter(Mandatory=$false,Position=4)]
         [string]$Variables,
         [Parameter(Mandatory=$false,Position=5)]
-        [string]$TemplatePath = ".\"
+        [string]$TemplatesPath = ".\templates",
+        [Parameter(Mandatory=$false,Position=6)]
+        [System.Collections.Generic.List]$ProvisioningSequence,
+        [Parameter(Mandatory=$false,Position=7)]
+        [switch]$GenerateJsonOnly
     )
 
-    switch ($OSName)
-    {
-        'Win2012R2' {
-            $osData = @{
-                os_name = 'win2012r2'
-                guest_os_type = @{vbox = 'Windows2012_64' ; vmware = 'windows8srv-64'}
-                full_os_name = 'Windows2012R2'
-                iso_checksum = '849734f37346385dac2c101e4aacba4626bb141c'
-                iso_checksum_type = 'md5'
-                iso_url = 'http://care.dlservice.microsoft.com/dl/download/6/2/A/62A76ABB-9990-4EFC-A4FE-C7D698DAEB96/9600.17050.WINBLUE_REFRESH.140317-1640_X64FRE_SERVER_EVAL_EN-US-IR3_SSS_X64FREE_EN-US_DV9.ISO'
-                autounattend = './scripts/answer_file_win2012/autounattend.xml'
-            }
-        }
-
-        'Win2016StdCore' {
-            $osData = @{
-                os_name = 'win2016stdcore'
-                guest_os_type = @{vbox = 'Windows2012_64' ; vmware = 'windows9srv-64'}
-                full_os_name = 'Windows2016StdCore'
-                iso_checksum = '18a4f00a675b0338f3c7c93c4f131beb'
-                iso_checksum_type = 'md5'
-                iso_url = 'http://care.dlservice.microsoft.com/dl/download/1/6/F/16FA20E6-4662-482A-920B-1A45CF5AAE3C/14393.0.160715-1616.RS1_RELEASE_SERVER_EVAL_X64FRE_EN-US.ISO'
-                autounattend = './scripts/answer_file_win2012/autounattend.xml'
-            }
-        }
-        
-        'Win10' {
-            $osData = @{
-                os_name = 'win2012r2'
-                guest_os_type = @{vbox = 'Windows10_64' ; vmware = 'windows9-64'}
-                full_os_name = 'Windows10'
-                iso_checksum = '6c60f91bf0ad7b20f469ab8f80863035c517f34f'
-                iso_checksum_type = 'md5'
-                iso_url = 'http://care.dlservice.microsoft.com/dl/download/B/8/B/B8B452EC-DD2D-4A8F-A88C-D2180C177624/15063.0.170317-1834.RS2_RELEASE_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO'
-                autounattend = './scripts/answer_file_win2012/autounattend.xml'
-            }
-        }
-        
-        'Win7' {
-            $osData = @{
-                os_name = 'win7ent'
-                guest_os_type = @{vbox = 'windows7-64' ; vmware = 'windows7-64'}
-                full_os_name = 'Windows7'
-                iso_checksum = '1D0D239A252CB53E466D39E752B17C28'
-                iso_checksum_type = 'md5'
-                iso_url = 'http://care.dlservice.microsoft.com/dl/download/evalx/win7/x64/EN/7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso'
-                autounattend = './scripts/answer_file_win7/Autounattend.xml'
-            }
-        }
-    }
-
+    # Select template based on options
     switch ($OSType)
     {
     
-        'linux'         {$ostypex = 'Linux'}
-        'windows'       {$ostypex = 'Windows'}
+        'linux'         {$ostypex = 'linux'}
+        'windows'       {$ostypex = 'windows'}
     
     }
     
@@ -130,22 +84,74 @@ function Start-BuildPackerTemplate {
     
     }
 
+    switch ($OSName)
+    {
+    
+        'Win2016StdCore'    {$DistroScriptsFolder = 'win-server-2016'}
+        'Win2012R2'         {$DistroScriptsFolder = 'win-server-2012'}
+        'Win10'             {$DistroScriptsFolder = 'win-desktop-10'}
+        'Win7'              {$DistroScriptsFolder = 'win-desktop-7'}
+        'UbuntuXenial'      {$DistroScriptsFolder = 'ubuntu18'}
+    
+    }
+
+    $full_template_path = "$TemplatesPath\$vmsourcex"
 
     # Run some basic checks to make sure everything is in place before deployment
-    if(!(Test-Path $TemplatePath\$vmsourcex)) {
-        Write-LogFile -Message "Template $($vmsourcex) is missing, please make sure you copy it to the right folder" -MessageType Info -WriteLogToStdOut
+    if(!(Test-Path $full_template_path)) {
+        Write-LogFile -Message "Template $full_template_path is missing, please make sure you copy it to the right folder" -MessageType Info -WriteLogToStdOut
     }
 
     # TODO: 
     # Read template.json
-    # buiild provisioners as blocks, place blocks in a template-blocks.json file
+    # buiild provisioners as blocks, place blocks in a pack-provisioners.json file
     # read variables from pack-variables to understand which things to run in the script phase. each phase separated by a restart: initial, choco packages, cleanup
     # generate dynamic template this way, then execute, forget about packer variable shit
+
+    # Read in Template
+    Write-LogFile -Message "Reading Template $full_template_path" -MessageType Info -WriteLogToStdOut
+    $packer_template = ConvertFrom-Json $(Get-Content -Raw ".\$TemplatesPath\$vmsourcex")
+
+    # Read in the contents of pack-variables.json
+    Write-LogFile -Message "Reading Packer Vars file" -MessageType Info -WriteLogToStdOut
+    $packer_vars = ConvertFrom-Json $(Get-Content -Raw ".\pack-variables.json")
+    $OSType2 = $packer_vars.os.$OSName.guest_os_type.$Platform
+
+    # Read in the contents of pack-provisioners.json
+    Write-LogFile -Message "Reading Packer Provisioners file" -MessageType Info -WriteLogToStdOut
+    $packer_provisioners = ConvertFrom-Json $(Get-Content -Raw ".\pack-provisioners.json")
+
+    # List files in the "common" script directory, these will be attached as floppy files
+    Write-LogFile -Message "Listing scripts in .\scripts\common" -MessageType Info -WriteLogToStdOut
+    $common_scripts = (Get-ChildItem .\scripts\common).FullName
     
-    # Build template with packer based on chosen options
-    # if the user chose to overload any variables provided in variables.json, they will be inserted in the commandline with $(if($Variables){$Variables})
+    # Check if only a JSON file should be generated
+    if ($GenerateJsonOnly) {
+        
+        # 1. Add common scripts and autounattend
+        $distro_unattend = (Get-ChildItem ".\scripts\$DistroScriptsFolder\answer_file\").FullName
+        $packer_template.builders[0].floppy_files = [System.Collections.ArrayList]$common_scripts
+        $packer_template.builders[0].floppy_files.Add($distro_unattend)
+
+        # 2. Generate Provisioners block based on sequence
+        # $ProvisioningSequence should be something like: @("show-banner", "prepare", "restart", "process", "cleanup")
+        # for loop that selects the blocks and appends them to a psobject
+        foreach($block in $ProvisioningSequence) {
+            foreach($template_block in ($packer_provisioners | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)) {
+                if ($template_block -eq $block) {
+                    
+                }
+            }
+        }
+        $packer_template.provisioners = $ProvisioningSequenceBlocks
+    }
+    else {
+        # Build template with packer based on chosen options
+        # if the user chose to overload any variables provided in variables.json, they will be inserted in the commandline with $(if($Variables){$Variables})
+        
+        Start-Process -FilePath 'packer.exe' -ArgumentList "build  -var-file=variables.json -var `"os_name=$($osData.os_name)`" -var `"iso_checksum=$($osData.iso_checksum)`" -var `"iso_checksum_type=$($osData.iso_checksum_type)`" -var `"iso_url=$($osData.iso_url)`" -var `"guest_os_type=$($osData.guest_os_type.platform)`" $(if($Variables){$Variables}) .\$($vmsourcex)" -Wait -NoNewWindow
+    }
     
-    Start-Process -FilePath 'packer.exe' -ArgumentList "build  -var-file=variables.json -var `"os_name=$($osData.os_name)`" -var `"iso_checksum=$($osData.iso_checksum)`" -var `"iso_checksum_type=$($osData.iso_checksum_type)`" -var `"iso_url=$($osData.iso_url)`" -var `"guest_os_type=$($osData.guest_os_type.platform)`" $(if($Variables){$Variables}) .\$($vmsourcex)" -Wait -NoNewWindow
 
 }
 
@@ -274,11 +280,8 @@ Function Write-LogFile {
             }
             else {
                 $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
-                $strScanCount = (Get-ItemProperty "HKLM:\SOFTWARE\Hydro\PrinterSchedulerBAP" -Name "ScanCount").ScanCount
-                If(!$strScanCount){$strScanCount = 0}
-
                 $RandomSuffix = Get-Random
-                $Global:strLogFile = "$OutputDir\$($env:computername)_hydro-bap-script-$strTimeNow-$strScanCount-$RandomSuffix.log"
+                $Global:strLogFile = "$OutputDir\$($env:computername)-packer-vm-producer-$strTimeNow-$RandomSuffix.log"
             }
         }
         
@@ -307,7 +310,6 @@ Function Write-LogFile {
 
         # Grabing Time in UTC
         $strTimeNow = (Get-Date).ToUniversalTime().ToString("yy-MM-ddTHH:mm:ssZ")
-        $strScanCount = (Get-ItemProperty "HKLM:\SOFTWARE\Hydro\PrinterSchedulerBAP" -Name "ScanCount" -ErrorAction SilentlyContinue).ScanCount
 
         if ($LogAsField) {
 
@@ -319,9 +321,7 @@ Function Write-LogFile {
             # To keep compatibility with Powershell V2 we can't use the [ordered] accelerator
             $strLogLine = New-Object System.Collections.Specialized.OrderedDictionary
             $strLogLine.Add("timestamp", $strTimeNow)
-            $strLogLine.Add("module", $CallingModule)
             $strLogLine.Add("hostname", $($env:COMPUTERNAME))
-            $strLogLine.Add("scancount", $strScanCount)
             
             ForEach ($key in $Dictionary.Keys){
 
@@ -339,9 +339,7 @@ Function Write-LogFile {
                 # To keep compatibility with Powershell V2 we can't use the [order] accelerator
                 $strLogLine = New-Object System.Collections.Specialized.OrderedDictionary
                 $strLogLine.Add("timestamp", $strTimeNow)
-                $strLogLine.Add("module", $CallingModule)
                 $strLogLine.Add("hostname", $($env:COMPUTERNAME))
-                $strLogLine.Add("scancount", $strScanCount)
                 $strLogLine.Add("message", $Message)
             }
         }

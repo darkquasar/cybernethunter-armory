@@ -1,21 +1,73 @@
 {
-	"output_directory": "./",
-	"source_path": "./",
-	"iso_url": "",
-	"iso_checksum_type": "md5",
-	"iso_checksum": "",
-	"guest_os_type": "",
-	"autounattend": "",
-	"cybersec_tools_folder": "C:\\Tools",
-	"install_windowsupdates": "False",
-	"install_vmware_tools": "True",
-	"install_notepadpp": "True",
-	"install_putty": "True",
-	"install_openssh": "True",
-	"install_flarevm": "False",
-	"install_boxstarter": "True",
-	"install_firefox": "True",
-	"install_chrome": "True",
-	"install_torbrowser": "False",
-	"install_sysinternals": "True"
+    "os": {
+        "Win2012R2": {
+            "os_name": "win2012r2",
+            "guest_os_type": {
+                "vbox": "Windows2012_64",
+                "vmware": "windows8srv-64"
+            },
+            "full_os_name": "Windows2012R2",
+            "iso_checksum": "849734f37346385dac2c101e4aacba4626bb141c",
+            "iso_checksum_type": "md5",
+            "iso_url": "http://care.dlservice.microsoft.com/dl/download/6/2/A/62A76ABB-9990-4EFC-A4FE-C7D698DAEB96/9600.17050.WINBLUE_REFRESH.140317-1640_X64FRE_SERVER_EVAL_EN-US-IR3_SSS_X64FREE_EN-US_DV9.ISO",
+            "autounattend": "./scripts/answer_file_win2012/autounattend.xml"
+        },
+        "Win2016StdCore": {
+            "os_name": "win2016stdcore",
+            "guest_os_type": {
+                "vbox": "Windows2012_64",
+                "vmware": "windows9srv-64"
+            },
+            "full_os_name": "Windows2016StdCore",
+            "iso_checksum": "18a4f00a675b0338f3c7c93c4f131beb",
+            "iso_checksum_type": "md5",
+            "iso_url": "http://care.dlservice.microsoft.com/dl/download/1/6/F/16FA20E6-4662-482A-920B-1A45CF5AAE3C/14393.0.160715-1616.RS1_RELEASE_SERVER_EVAL_X64FRE_EN-US.ISO",
+            "autounattend": "./scripts/answer_file_win2012/autounattend.xml"
+        },
+        "Win10": {
+            "os_name": "win2012r2",
+            "guest_os_type": {
+                "vbox": "Windows10_64",
+                "vmware": "windows9-64"
+            },
+            "full_os_name": "Windows10",
+            "iso_checksum": "6c60f91bf0ad7b20f469ab8f80863035c517f34f",
+            "iso_checksum_type": "md5",
+            "iso_url": "http://care.dlservice.microsoft.com/dl/download/B/8/B/B8B452EC-DD2D-4A8F-A88C-D2180C177624/15063.0.170317-1834.RS2_RELEASE_CLIENTENTERPRISEEVAL_OEMRET_X64FRE_EN-US.ISO",
+            "autounattend": "./scripts/answer_file_win2012/autounattend.xml"
+        },
+        "Win7": {
+            "os_name": "win7ent",
+            "guest_os_type": {
+                "vbox": "windows7-64",
+                "vmware": "windows7-64"
+            },
+            "full_os_name": "Windows7",
+            "iso_checksum": "1D0D239A252CB53E466D39E752B17C28",
+            "iso_checksum_type": "md5",
+            "iso_url": "http://care.dlservice.microsoft.com/dl/download/evalx/win7/x64/EN/7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso",
+            "autounattend": "./scripts/answer_file_win7/Autounattend.xml"
+        }
+    },
+    "user_variables": {
+        "output_directory": "./",
+        "source_path": "./",
+        "iso_url": "",
+        "iso_checksum_type": "md5",
+        "iso_checksum": "",
+        "guest_os_type": "",
+        "autounattend": "",
+        "cybersec_tools_folder": "C:\\Tools",
+        "install_windowsupdates": "False",
+        "install_vmware_tools": "True",
+        "install_notepadpp": "True",
+        "install_putty": "True",
+        "install_openssh": "True",
+        "install_flarevm": "False",
+        "install_boxstarter": "True",
+        "install_firefox": "True",
+        "install_chrome": "True",
+        "install_torbrowser": "False",
+        "install_sysinternals": "True"
+    }
 }

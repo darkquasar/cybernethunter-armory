@@ -1,52 +1,35 @@
 {
-  "builders": [
-    {
-      "type": "vmware-iso",
-      "iso_url": "{{user `iso_url`}}",
-      "iso_checksum_type": "{{user `iso_checksum_type`}}",
-      "iso_checksum": "{{user `iso_checksum`}}",
-	  "headless": true,
-      "boot_wait": "1s",
-      "ssh_username": "vagrant",
-      "ssh_password": "vagrant",
-      "ssh_wait_timeout": "8h",
-	  "communicator": "winrm",
-	  "winrm_username": "vagrant",
-	  "winrm_password": "vagrant",
-	  "winrm_timeout": "12h",
-	  "output_directory": "{{user `output_directory`}}",
-      "shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
-      "guest_os_type": "windows7-64",
-	  "skip_compaction": "true",
-      "disk_size": 61440,
-      "vnc_port_min": 5900,
-      "vnc_port_max": 5980,
-      "floppy_files": [
-        "{{user `autounattend`}}",
-        "./scripts/dis-updates.ps1",
-        "./scripts/hotfix-KB3102810.bat",
-        "./scripts/microsoft-updates.bat",
-        "./scripts/win-updates.ps1",
-        "./scripts/openssh.ps1",
-		"./scripts/winrm.ps1"
-      ],
-      "vmx_data": {
-        "RemoteDisplay.vnc.enabled": "false",
-        "RemoteDisplay.vnc.port": "5900",
-        "memsize": "2048",
-        "numvcpus": "2",
-        "scsi0.virtualDev": "lsisas1068"
-      }
-	 }
+    "builders": [{
+        "type": "vmware-iso",
+        "iso_url": "{{user `iso_url`}}",
+        "iso_checksum_type": "{{user `iso_checksum_type`}}",
+        "iso_checksum": "{{user `iso_checksum`}}",
+        "headless": true,
+        "boot_wait": "1s",
+        "ssh_username": "vagrant",
+        "ssh_password": "vagrant",
+        "ssh_wait_timeout": "8h",
+        "communicator": "winrm",
+        "winrm_username": "vagrant",
+        "winrm_password": "vagrant",
+        "winrm_timeout": "45m",
+        "output_directory": "{{user `output_directory`}}",
+        "shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
+        "guest_os_type": "{{user `guest_os_type`}}",
+        "skip_compaction": "true",
+        "disk_size": 30000,
+        "vnc_port_min": 5900,
+        "vnc_port_max": 5980,
+        "floppy_files": [],
+        "vmx_data": {
+            "RemoteDisplay.vnc.enabled": "false",
+            "RemoteDisplay.vnc.port": "5900",
+            "memsize": "2048",
+            "numvcpus": "2",
+            "scsi0.virtualDev": "lsisas1068"
+        }
+        }
     ],
-  "provisioners": [
-    {
-		"type": "powershell",
-		"elevated_user": "vagrant",
-		"elevated_password": "vagrant",
-		"inline": [
-			"Get-Process"
-		]
-    }
-  ]
+    "provisioners": [],
+    "variables": {}
 }
