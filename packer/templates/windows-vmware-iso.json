@@ -22,6 +22,7 @@
         "disk_size": 30000,
         "vnc_port_min": 5900,
         "vnc_port_max": 5980,
+        "vnc_disable_password": true,
         "floppy_files": [],
         "vmx_data": {
             "RemoteDisplay.vnc.enabled": "false",

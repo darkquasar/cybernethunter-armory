@@ -62,7 +62,7 @@ function Start-BuildPackerTemplate {
         [System.Collections.ArrayList]$ProvisioningSequence,
 
         [Parameter(Mandatory=$false,Position=7)]
-        [string]$VMOutputDirectory=".\",
+        [string]$VMOutputDirectory=".\vm-output",
 
         [Parameter(Mandatory=$false,Position=8)]
         [switch]$GenerateJsonOnly
@@ -176,7 +176,7 @@ function Start-BuildPackerTemplate {
     # Check if only a JSON file should be generated
     if ($GenerateJsonOnly) {
         $RandomUUID = [Guid]::newGuid()
-        $packer_template | ConvertTo-Json -Depth 32 | Out-File "packer-template-$RandomUUID.json"
+        $packer_template | ConvertTo-Json -Depth 32 | Out-File "packer-template-$RandomUUID.json" -Encoding Ascii -Force
         $packer_template | ConvertTo-Json -Depth 32
     }
     else {
