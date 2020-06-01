@@ -4,20 +4,15 @@
         "iso_url": "{{user `iso_url`}}",
         "iso_checksum_type": "{{user `iso_checksum_type`}}",
         "iso_checksum": "{{user `iso_checksum`}}",
-        "guest_os_type": "{{user `guest_os_type`}}",
-        "output_directory": "{{user `output_directory`}}",
         "headless": true,
-		"boot_wait": "1m",
-        "boot_command": [
-            "<down>",
-            "<enter>"
-        ],
-        "communicator": "winrm",
-        "winrm_username": "vagrant",
-        "winrm_password": "vagrant",
-        "winrm_timeout": "45m",
-        "pause_before_connecting": "2m",
+        "boot_wait": "1m",
+        "communicator": "ssh",
+        "ssh_username": "vagrant",
+        "ssh_password": "vagrant",
+        "ssh_wait_timeout": "8h",
+        "output_directory": "{{user `output_directory`}}",
         "shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
+        "guest_os_type": "{{user `guest_os_type`}}",
         "skip_compaction": "true",
         "disk_size": 30000,
         "vnc_port_min": 5900,
@@ -33,12 +28,5 @@
         }
     ],
     "provisioners": [],
-    "variables": {
-        "output_directory": "./",
-        "iso_url": "",
-        "iso_checksum_type": "",
-        "iso_checksum": "",
-        "guest_os_type": "",
-        "autounattend": ""
-    }
+    "variables": {}
 }

@@ -3,7 +3,7 @@
         "type": "windows-restart",
         "restart_timeout": "1h"
     },
-    "prepare": {
+    "show-banner": {
         "type": "powershell",
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
@@ -11,15 +11,21 @@
             "[System.Text.Encoding]::Unicode.GetString([System.Convert]::FromBase64String(\"DQAKACAAXwBfAF8AXwBfACAAXwAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAXwAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgAF8AIAAgACAAXwAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIABfAF8AIAAgACAAIAAgACAAIABfACAAIAAgACAAIAANAAoALwBfAF8AIAAgACAAXAAgAHwAXwBfACAAIABfACAAXwBfACAAXwBfAF8AIAAgAF8AXwAgAF8AfAAgAHwAXwAgACAALwBcACAAIAAvAFwAXwAgACAAIABfACAAXwAgAF8AXwAgAHwAIAB8AF8AKABfACkAXwAgAF8AXwAgACAAIABfAF8AIABfACAAIAAvACAALwAgACAAXwBfACAAXwB8ACAAfABfAF8AIAAgAA0ACgAgACAALwAgAC8AXAAvACAAJwBfACAAXAB8ACAAJwBfAF8ALwAgAF8AIABcAC8AIABfAGAAIAB8ACAAXwBfAHwALwAgAC8AXwAvACAALwAgAHwAIAB8ACAAfAAgACcAXwAgAFwAfAAgAF8AXwB8ACAAfAAgACcAXwAgAFwAIAAvACAAXwBgACAAfAAvACAALwAgACAALwAgAF8AYAAgAHwAIAAnAF8AIABcACAADQAKACAALwAgAC8AIAAgAHwAIAB8ACAAfAAgAHwAIAB8ACAAfAAgACAAXwBfAC8AIAAoAF8AfAAgAHwAIAB8AF8ALwAgAF8AXwAgACAALwB8ACAAfABfAHwAIAB8ACAAfAAgAHwAIAB8ACAAfABfAHwAIAB8ACAAfAAgAHwAIAB8ACAAKABfAHwAIAAvACAALwBfAF8AfAAgACgAXwB8ACAAfAAgAHwAXwApACAAfAANAAoAIABcAC8AIAAgACAAfABfAHwAIAB8AF8AfABfAHwAIAAgAFwAXwBfAF8AfABcAF8AXwAsAF8AfABcAF8AXwBcAC8AIAAvAF8ALwAgACAAXABfAF8ALABfAHwAXwB8ACAAfABfAHwAXABfAF8AfABfAHwAXwB8ACAAfABfAHwAXABfAF8ALAAgAFwAXwBfAF8AXwAvAFwAXwBfACwAXwB8AF8ALgBfAF8ALwAgAA0ACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAB8AF8AXwBfAC8AIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAADQAKAA0ACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIABiAHkAIABEAGEAcgBrAFEAdQBhAHMAYQByACwAIABhACAASgBlAGQAeQAtAGYAbABpAHAAcABpAG4AZwAtAHQAYQBiAGwAZQBzACAAZAB1AGQAZQAgACgALgBfAC4AKQAgAH4AIAA1/iAAOyUBJTslDQAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgAA==\"))",
             "Write-Host \"                       ====================================                   \"",
             "Write-Host \"                       ==== Starting PowerShell Script ====                   \"",
-            "Write-Host \"                       ====================================                   \"",
-            "Start-Process -FilePath \"$PSHOME/powershell\" -ArgumentList \". C:/Users/vagrant/THL-Provisioner-01.ps1 ; Configure-Generics-Start\" -NoNewWindow -Wait",
+            "Write-Host \"                       ====================================                   \""
+        ]
+    },    
+    "prepare": {
+        "type": "powershell",
+        "elevated_user": "vagrant",
+        "elevated_password": "vagrant",
+        "inline": [
+            "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
+            "Invoke-Expression ( Invoke-WebRequest \"https://raw.githubusercontent.com/darkquasar/cyber-tools/master/packer/scripts/provisioning/THL-Provisioner-03.ps1\" -UseDefaultCredentials )",
+            "Configure-Generics-Start -NoNewWindow -Wait",
             "Start-Job -Name DisableWindowsUpdates -ScriptBlock { . A:\\THL-Provisioner-01.ps1 ; Disable-WindowsUpdates } | Wait-Job | Receive-Job -Wait",
             "Start-Job -Name InstallChocolatey -ScriptBlock { . A:\\THL-Provisioner-01.ps1 ; Install-Chocolatey } | Wait-Job | Receive-Job -Wait"
         ],
-        "environment_vars": [
-            "install_vmware_tools={{user `install_vmware_tools`}}",
-            "cybersec_tools_folder={{user `cybersec_tools_folder`}}"
-        ]
+        "environment_vars": []
     },
     "process": {
         "type": "powershell",
@@ -29,17 +35,7 @@
             ". C:/Users/vagrant/THL-Provisioner-01.ps1 ; Install-ChocoPackages",
             "Get-Job"
         ],
-        "environment_vars": [
-            "cybersec_tools_folder={{user `cybersec_tools_folder`}}",
-            "install_notepadpp={{user `install_notepadpp`}}",
-            "install_openssh={{user `install_openssh`}}",
-            "install_flarevm={{user `install_flarevm`}}",
-            "install_boxstarter={{user `install_boxstarter`}}",
-            "install_firefox={{user `install_firefox`}}",
-            "install_chrome={{user `install_chrome`}}",
-            "install_torbrowser={{user `install_torbrowser`}}",
-            "install_sysinternals={{user `install_sysinternals`}}"
-        ]
+        "environment_vars": []
     },
     "cleanup": {}
 }

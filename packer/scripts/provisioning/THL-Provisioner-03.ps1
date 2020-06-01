@@ -9,6 +9,11 @@
 	Diego Perez - THL - 2017
 #>
 
+function Start-DummyFunction {
+	Write-Host "This is a Dummy Function" -ForegroundColor Green
+}
+
+
 function Configure-Generics-Start {
 	<#
 	
@@ -32,7 +37,7 @@ function Configure-Generics-Start {
 	# Downloading & Installing VMWare Tools
 	Write-Host "Downloading & Installing VMWare Tools..." -ForegroundColor Green
 	
-	Start-Job -Name DonwloadVmWareTools -ScriptBlock { (New-Object System.Net.WebClient).DownloadFile('http://softwareupdate.vmware.com/cds/vmw-desktop/ws/12.5.7/5813279/windows/packages/tools-windows.tar', 'C:\Windows\Temp\vmware-tools.tar') } | Wait-Job
+	Start-Job -Name DonwloadVmWareTools -ScriptBlock { (New-Object System.Net.WebClient).DownloadFile('https://softwareupdate.vmware.com/cds/vmw-desktop/ws/15.5.0/14665864/windows/packages/tools-windows.tar', 'C:\Windows\Temp\vmware-tools.tar') } | Wait-Job
 	
 	Write-Host "Downloaded VMWare Tools" -ForegroundColor Green
 	Start-Process -FilePath "$env:comspec" -ArgumentList "/c ""C:\Program Files\7-Zip\7z.exe"" x C:\Windows\Temp\vmware-tools.tar -oC:\Windows\Temp" -Wait

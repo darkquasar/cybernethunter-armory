@@ -39,23 +39,34 @@ function Start-BuildPackerTemplate {
         [Parameter(Mandatory=$true,Position=0)]
         [ValidateSet("vbox", "vmware", "vagrant")]
         [string]$Platform,
+
         [Parameter(Mandatory=$false,Position=1)]
         [ValidateSet("linux", "windows")]
         [string]$OSType = "windows",
+
         [Parameter(Mandatory=$true,Position=2)]
         [ValidateSet("Win2012R2", "Win2016StdCore", "Win10", "Win7", "UbuntuXenial")]
         [string]$OSName,
+
         [Parameter(Mandatory=$true,Position=3)]
         [ValidateSet("iso", "vmx")]
         [string]$VMSource,
+
         [Parameter(Mandatory=$false,Position=4)]
         [string]$Variables,
+
         [Parameter(Mandatory=$false,Position=5)]
         [string]$TemplatesPath = ".\templates",
+
         [Parameter(Mandatory=$false,Position=6)]
-        [System.Collections.Generic.List]$ProvisioningSequence,
+        [System.Collections.ArrayList]$ProvisioningSequence,
+
         [Parameter(Mandatory=$false,Position=7)]
+        [string]$VMOutputDirectory=".\",
+
+        [Parameter(Mandatory=$false,Position=8)]
         [switch]$GenerateJsonOnly
+
     )
 
     # Select template based on options
@@ -104,46 +115,69 @@ function Start-BuildPackerTemplate {
 
     # TODO: 
     # Read template.json
-    # buiild provisioners as blocks, place blocks in a pack-provisioners.json file
-    # read variables from pack-variables to understand which things to run in the script phase. each phase separated by a restart: initial, choco packages, cleanup
+    # buiild provisioners as blocks, place blocks in a packer-provisioners.json file
+    # read variables from packer-variables to understand which things to run in the script phase. each phase separated by a restart: initial, choco packages, cleanup
     # generate dynamic template this way, then execute, forget about packer variable shit
 
     # Read in Template
     Write-LogFile -Message "Reading Template $full_template_path" -MessageType Info -WriteLogToStdOut
     $packer_template = ConvertFrom-Json $(Get-Content -Raw ".\$TemplatesPath\$vmsourcex")
 
-    # Read in the contents of pack-variables.json
+    # Read in the contents of packer-variables.json
     Write-LogFile -Message "Reading Packer Vars file" -MessageType Info -WriteLogToStdOut
-    $packer_vars = ConvertFrom-Json $(Get-Content -Raw ".\pack-variables.json")
+    $packer_vars = ConvertFrom-Json $(Get-Content -Raw ".\packer-variables.json")
     $OSType2 = $packer_vars.os.$OSName.guest_os_type.$Platform
 
-    # Read in the contents of pack-provisioners.json
+    # Read in the contents of packer-provisioners.json
     Write-LogFile -Message "Reading Packer Provisioners file" -MessageType Info -WriteLogToStdOut
-    $packer_provisioners = ConvertFrom-Json $(Get-Content -Raw ".\pack-provisioners.json")
+    $packer_provisioners = ConvertFrom-Json $(Get-Content -Raw ".\packer-provisioners.json")
 
     # List files in the "common" script directory, these will be attached as floppy files
     Write-LogFile -Message "Listing scripts in .\scripts\common" -MessageType Info -WriteLogToStdOut
     $common_scripts = (Get-ChildItem .\scripts\common).FullName
     
-    # Check if only a JSON file should be generated
-    if ($GenerateJsonOnly) {
-        
-        # 1. Add common scripts and autounattend
-        $distro_unattend = (Get-ChildItem ".\scripts\$DistroScriptsFolder\answer_file\").FullName
-        $packer_template.builders[0].floppy_files = [System.Collections.ArrayList]$common_scripts
-        $packer_template.builders[0].floppy_files.Add($distro_unattend)
+    # Generate Final Template for Packer
 
-        # 2. Generate Provisioners block based on sequence
-        # $ProvisioningSequence should be something like: @("show-banner", "prepare", "restart", "process", "cleanup")
-        # for loop that selects the blocks and appends them to a psobject
-        foreach($block in $ProvisioningSequence) {
-            foreach($template_block in ($packer_provisioners | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)) {
-                if ($template_block -eq $block) {
-                    
+    # 1. Add common scripts and autounattend
+    $distro_unattend = (Get-ChildItem ".\scripts\$DistroScriptsFolder\answer_file\").FullName
+    $packer_template.builders[0].floppy_files = [System.Collections.ArrayList]$common_scripts
+    $packer_template.builders[0].floppy_files.Add($distro_unattend) | Out-Null
+
+    # 2. Generate Provisioners block based on sequence
+    # $ProvisioningSequence should be something like: @("show-banner", "prepare", "restart", "process", "cleanup")
+    # for loop that selects the blocks and appends them to a psobject
+    [System.Collections.ArrayList]$packer_template_provisioners = @()
+    foreach($block in $ProvisioningSequence) {
+        foreach($template_block in ($packer_provisioners | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name)) {
+            if ($template_block -eq $block) {
+                try {
+                    # Append environment variables from packer-variables.json to each block
+                    $packer_provisioners.$template_block.environment_vars = $packer_vars.environment_variables
+                    $packer_template_provisioners.Add($packer_provisioners.$template_block) | Out-Null
                 }
+                catch {
+                    continue
+                }
+                
             }
         }
-        $packer_template.provisioners = $ProvisioningSequenceBlocks
+    }
+    $packer_template.provisioners = $packer_template_provisioners
+
+    # 3. Add packer variables
+    #[System.Collections.ArrayList]$packer_template.variables = @()
+    $packer_template.variables.iso_url = $packer_vars.os.$OSName.iso_url
+    $packer_template.variables.iso_checksum_type = $packer_vars.os.$OSName.iso_checksum_type
+    $packer_template.variables.iso_checksum = $packer_vars.os.$OSName.iso_checksum
+    $packer_template.variables.guest_os_type = $packer_vars.os.$OSName.guest_os_type.$Platform
+    $packer_template.variables.autounattend = $packer_vars.os.$OSName.autounattend
+    $packer_template.variables.output_directory = $VMOutputDirectory
+
+    # Check if only a JSON file should be generated
+    if ($GenerateJsonOnly) {
+        $RandomUUID = [Guid]::newGuid()
+        $packer_template | ConvertTo-Json -Depth 32 | Out-File "packer-template-$RandomUUID.json"
+        $packer_template | ConvertTo-Json -Depth 32
     }
     else {
         # Build template with packer based on chosen options
@@ -153,59 +187,6 @@ function Start-BuildPackerTemplate {
     }
     
 
-}
-
-Function ConvertFrom-JsonV2 {
-
-    <#
-
-    .SYNOPSIS
-    Simple helper function to convert to JSON compatible with Powershell V2.0
-
-    #>
-
-    Param ( 
-        [Parameter(Mandatory=$True)]
-        [Object]$Item
-    )
-
-    Add-Type -Assembly System.Web.Extensions
-    $ps_js = New-Object System.Web.Script.Serialization.JavascriptSerializer
-
-    #The comma operator is the array construction operator in PowerShell
-    Return ,$ps_js.DeserializeObject($item)
-}
-
-Function ConvertTo-JsonV2 {
-
-    <#
-
-    .SYNOPSIS
-    Simple helper function to convert to JSON compatible with Powershell V2.0
-
-    #>
-
-    Param ( 
-        [Parameter(Mandatory=$True)]
-        [Object]$Item
-    )
-
-
-
-    try {
-        Add-Type -Assembly System.Web.Extensions
-        $ps_js = New-Object System.Web.Script.Serialization.JavascriptSerializer
-        $SerializedJSON = $ps_js.Serialize($Item)
-    }
-
-    catch [System.Management.Automation.RuntimeException] {
-        $SerializedJSON = [LitJson.JsonMapper]::ToJson($Item)
-    }
-    catch [System.IO.FileNotFoundException] {
-        $SerializedJSON = [LitJson.JsonMapper]::ToJson($Item)
-    }
-
-    Return $SerializedJSON
 }
 
 Function Write-LogFile {

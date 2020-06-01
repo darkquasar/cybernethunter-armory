@@ -49,14 +49,15 @@
             "autounattend": "./scripts/answer_file_win7/Autounattend.xml"
         }
     },
-    "user_variables": {
+    "packer_variables": {
         "output_directory": "./",
-        "source_path": "./",
         "iso_url": "",
-        "iso_checksum_type": "md5",
+        "iso_checksum_type": "",
         "iso_checksum": "",
         "guest_os_type": "",
-        "autounattend": "",
+        "autounattend": ""
+    },
+    "environment_variables": {
         "cybersec_tools_folder": "C:\\Tools",
         "install_windowsupdates": "False",
         "install_vmware_tools": "True",
