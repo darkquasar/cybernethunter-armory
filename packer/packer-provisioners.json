@@ -20,10 +20,11 @@
         "elevated_password": "vagrant",
         "inline": [
             "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
-            "Invoke-Expression ( Invoke-WebRequest \"https://raw.githubusercontent.com/darkquasar/cyber-tools/master/packer/scripts/provisioning/THL-Provisioner-03.ps1\" -UseDefaultCredentials )",
+            "$ProvisioningScript = (New-Object Net.Webclient).DownloadString(\"https://raw.githubusercontent.com/darkquasar/cyber-tools/master/packer/scripts/provisioning/THL-Provisioner-03.ps1\")",
+            "Invoke-Expression $ProvisioningScript",
             "Configure-Generics-Start -NoNewWindow -Wait",
-            "Start-Job -Name DisableWindowsUpdates -ScriptBlock { . A:\\THL-Provisioner-01.ps1 ; Disable-WindowsUpdates } | Wait-Job | Receive-Job -Wait",
-            "Start-Job -Name InstallChocolatey -ScriptBlock { . A:\\THL-Provisioner-01.ps1 ; Install-Chocolatey } | Wait-Job | Receive-Job -Wait"
+            "Start-Job -Name DisableWindowsUpdates -ScriptBlock { Invoke-Expression $using:ProvisioningScript ; Disable-WindowsUpdates } | Wait-Job | Receive-Job -Wait",
+            "Start-Job -Name InstallChocolatey -ScriptBlock { Invoke-Expression $using:ProvisioningScript ; Install-Chocolatey } | Wait-Job | Receive-Job -Wait"
         ],
         "environment_vars": []
     },
@@ -32,7 +33,10 @@
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
         "inline": [
-            ". C:/Users/vagrant/THL-Provisioner-01.ps1 ; Install-ChocoPackages",
+            "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
+            "$ProvisioningScript = (New-Object Net.Webclient).DownloadString(\"https://raw.githubusercontent.com/darkquasar/cyber-tools/master/packer/scripts/provisioning/THL-Provisioner-03.ps1\")",
+            "Invoke-Expression $ProvisioningScript",
+            "Install-ChocoPackages",
             "Get-Job"
         ],
         "environment_vars": []

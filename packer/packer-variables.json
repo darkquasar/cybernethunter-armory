@@ -69,6 +69,6 @@
         "install_firefox": "True",
         "install_chrome": "True",
         "install_torbrowser": "False",
-        "install_sysinternals": "True"
+        "install_sysinternals": "False"
     }
 }
