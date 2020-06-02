@@ -32,8 +32,8 @@
         "elevated_password": "vagrant",
         "inline": [
             "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
-            ". A:\\CyberAnalystVM-DownloadProvisioner.ps1",
-            "Invoke-RelaxProxy",
+            ". A:\\CyberAnalystVM-DownloadProvisioner.ps1 ; $ProvisioningScript = Start-DownloadCyberAnalystVMProvisioner",
+            "Invoke-Expression $ProvisioningScript",
             "Install-ChocoPackages"
         ],
         "environment_vars": []

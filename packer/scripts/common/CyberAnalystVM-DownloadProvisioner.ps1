@@ -10,6 +10,13 @@
 
 function Invoke-RelaxProxy {
 
+    # Extracted from FLAREVM
+    # Authorship of this snip goes to them
+    # Set TLS 1.2 (3072), then TLS 1.1 (768), then TLS 1.0 (192), finally SSL 3.0 (48)
+    # Use integers because the enumeration values for TLS 1.2 and TLS 1.1 won't
+    # exist in .NET 4.0, even though they are addressable if .NET 4.5+ is
+    # installed (.NET 4.5 is an in-place upgrade).
+    [System.Net.ServicePointManager]::SecurityProtocol = 3072 -bor 768 -bor 192 -bor 48
 
     # Proxies are too uptight and create problems with Powershell and trusted certs :)
     # Allow current PowerShell session to trust all certificates. Ref: https://stackoverflow.com/questions/11696944/powershell-v3-invoke-webrequest-https-error

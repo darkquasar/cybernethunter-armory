@@ -8,7 +8,7 @@
         "winrm_username": "vagrant",
         "winrm_password": "vagrant",
         "winrm_timeout": "45m",
-        "pause_before_connecting": "2m",
+        "pause_before_connecting": "10s",
         "shutdown_command": "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\"",
         "skip_compaction": "true",
         "shutdown_timeout": "1h",
