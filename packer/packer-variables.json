@@ -51,6 +51,7 @@
     },
     "packer_variables": {
         "output_directory": ".\\cyberavm-output",
+        "vm_name": "",
         "iso_url": "",
         "iso_checksum_type": "",
         "iso_checksum": "",
@@ -58,7 +59,7 @@
         "autounattend": ""
     },
     "environment_variables": [
-        "cybersec_tools_folder=\"C:\\Tools\"",
+        "cybersec_tools_folder=C:\\Tools",
         "install_windowsupdates=False",
         "install_vmware_tools=True",
         "install_notepadpp=True",

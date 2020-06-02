@@ -64,18 +64,21 @@ function Start-BuildPackerTemplate {
         [string]$VMSource,
 
         [Parameter(Mandatory=$false,Position=4)]
-        [string]$Variables,
+        [string]$VMXSourcePath="",
 
         [Parameter(Mandatory=$false,Position=5)]
-        [string]$TemplatesPath = ".\templates",
+        [string]$Variables,
 
         [Parameter(Mandatory=$false,Position=6)]
-        [System.Collections.ArrayList]$ProvisioningSequence,
+        [string]$TemplatesPath = ".\templates",
 
         [Parameter(Mandatory=$false,Position=7)]
-        [string]$VMOutputDirectory=".\cyberavm-output",
+        [System.Collections.ArrayList]$ProvisioningSequence,
 
         [Parameter(Mandatory=$false,Position=8)]
+        [string]$VMOutputDirectory=".\cyberavm-output",
+
+        [Parameter(Mandatory=$false,Position=9)]
         [switch]$GenerateJsonOnly
 
     )
@@ -171,13 +174,32 @@ function Start-BuildPackerTemplate {
 
     # 3. Add packer variables
     #[System.Collections.ArrayList]$packer_template.variables = @()
-    $packer_template.variables.iso_url = $packer_vars.os.$OSName.iso_url
-    $packer_template.variables.iso_checksum_type = $packer_vars.os.$OSName.iso_checksum_type
-    $packer_template.variables.iso_checksum = $packer_vars.os.$OSName.iso_checksum
-    $packer_template.variables.guest_os_type = $packer_vars.os.$OSName.guest_os_type.$Platform
-    $packer_template.variables.autounattend = $packer_vars.os.$OSName.autounattend
-    $packer_template.variables.output_directory = $VMOutputDirectory
+    $VMName = "$DistroScriptsFolder.vmx"
+    try {
+        if ($VMSource -eq "iso") {
+            $packer_template.variables.iso_url = $packer_vars.os.$OSName.iso_url
+            $packer_template.variables.iso_checksum_type = $packer_vars.os.$OSName.iso_checksum_type
+            $packer_template.variables.iso_checksum = $packer_vars.os.$OSName.iso_checksum
+            $packer_template.variables.guest_os_type = $packer_vars.os.$OSName.guest_os_type.$Platform
+            $packer_template.variables.autounattend = $packer_vars.os.$OSName.autounattend
+            $packer_template.variables.output_directory = $VMOutputDirectory
+            $packer_template.variables.vm_name = $VMName
+        }
+        elseif ($VMSource -eq "vmx") {
 
+            if ($VMXSourcePath) {
+                $packer_template.variables.source_path = $VMXSourcePath
+            }
+            else {
+                # Look by default in the output folder
+                $packer_template.variables.source_path = "$VMOutputDirectory\$VMName"
+            }
+
+        }
+    }
+    catch {
+        Write-LogFile -Message "Some variables could not be set. Potentially due to template issues" -MessageType Info -WriteLogToStdOut
+    }
     # Check if only a JSON file should be generated
     if ($GenerateJsonOnly) {
         $RandomUUID = [Guid]::newGuid()

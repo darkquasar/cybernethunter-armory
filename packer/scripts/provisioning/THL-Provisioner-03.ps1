@@ -31,26 +31,36 @@ function Start-ConfigureGenerics {
     Start-Process -FilePath "$env:comspec" -ArgumentList "/c msiexec /qb /i C:\Windows\Temp\7z920-x64.msi" -NoNewWindow -Wait
     
     # Checking if packer variable was passed to the build instance, otherwise exit
-    if ($env:install_vmware_tools -eq $false) {return}
+    if ($env:install_vmware_tools -eq $true) {
     
-    # Downloading & Installing VMWare Tools
-    Write-Host "Downloading & Installing VMWare Tools..." -ForegroundColor Green
-    
-    Start-Job -Name DonwloadVmWareTools -ScriptBlock { (New-Object System.Net.WebClient).DownloadFile('https://softwareupdate.vmware.com/cds/vmw-desktop/ws/15.5.0/14665864/windows/packages/tools-windows.tar', 'C:\Windows\Temp\vmware-tools.tar') } | Wait-Job
-    
-    Write-Host "Downloaded VMWare Tools" -ForegroundColor Green
-    Start-Process -FilePath "$env:comspec" -ArgumentList "/c ""C:\Program Files\7-Zip\7z.exe"" x C:\Windows\Temp\vmware-tools.tar -oC:\Windows\Temp" -Wait
-    
-    Write-Host "Locating & Renaming Installer" -ForegroundColor Green
-    Start-Job -Name Rename -ScriptBlock { Get-ChildItem "C:\Windows\Temp" -File -Filter "vm*iso" | Rename-Item -NewName "vmWareTools.iso" } | Wait-Job
-    if(Test-Path "C:\Program Files (x86)\VMWare") {Get-Item "C:\Windows\Temp\vmWareTools.iso" | Remove-Item -Recurse -Force} 
-    
-    Write-Host "Uncompressing VMWareTools Image" -ForegroundColor Green
-    Start-Process -FilePath "$env:comspec" -ArgumentList "cmd /c ""C:\Program Files\7-Zip\7z.exe"" x C:\Windows\Temp\vmWareTools.iso -oC:\Windows\Temp\VMWare" | Out-Null
-    Start-Sleep 2
-    
-    Write-Host "Installing VMWare Tools" -ForegroundColor Green
-    Start-Process -FilePath "$env:comspec" -ArgumentList "/c C:\Windows\Temp\VMWare\setup64.exe /S/v ""/qn REBOOT=R""" -NoNewWindow -Wait
+        # Downloading & Installing VMWare Tools
+        Write-Host "Downloading & Installing VMWare Tools..." -ForegroundColor Green
+        
+        Start-Job -Name DonwloadVmWareTools -ScriptBlock { (New-Object System.Net.WebClient).DownloadFile('https://softwareupdate.vmware.com/cds/vmw-desktop/ws/15.5.0/14665864/windows/packages/tools-windows.tar', 'C:\Windows\Temp\vmware-tools.tar') } | Wait-Job
+        
+        if (Test-Path 'C:\Windows\Temp\vmware-tools.tar') {
+            Write-Host "Downloaded VMWare Tools" -ForegroundColor Green
+        }
+        else {
+            Write-Host "Could not download VMWare Tools" -ForegroundColor Green
+        }
+        
+        Start-Process -FilePath "$env:comspec" -ArgumentList "/c ""C:\Program Files\7-Zip\7z.exe"" x C:\Windows\Temp\vmware-tools.tar -oC:\Windows\Temp -y" -Wait
+        
+        Write-Host "Locating & Renaming Installer" -ForegroundColor Green
+        Start-Job -Name Rename -ScriptBlock { Get-ChildItem "C:\Windows\Temp" -File -Filter "vm*iso" | Rename-Item -NewName "vmWareTools.iso" } | Wait-Job
+        if(Test-Path "C:\Program Files (x86)\VMWare") {
+            Write-Host "VMWare Tools already installed, deleting ISO" -ForegroundColor Green
+            Get-Item "C:\Windows\Temp\vmWareTools.iso" | Remove-Item -Recurse -Force
+        } 
+        
+        Write-Host "Uncompressing VMWareTools Image" -ForegroundColor Green
+        Start-Process -FilePath "$env:comspec" -ArgumentList "cmd /c ""C:\Program Files\7-Zip\7z.exe"" x C:\Windows\Temp\vmWareTools.iso -oC:\Windows\Temp\VMWare" | Out-Null
+        Start-Sleep 2
+        
+        Write-Host "Installing VMWare Tools" -ForegroundColor Green
+        Start-Process -FilePath "$env:comspec" -ArgumentList "/c C:\Windows\Temp\VMWare\setup64.exe /S/v ""/qn REBOOT=R""" -NoNewWindow -Wait
+    }
 
     # Enable RDP
     Write-Host "Enabling RDP..." -ForegroundColor Green

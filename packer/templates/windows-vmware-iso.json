@@ -6,6 +6,7 @@
         "iso_checksum": "{{user `iso_checksum`}}",
         "guest_os_type": "{{user `guest_os_type`}}",
         "output_directory": "{{user `output_directory`}}",
+        "vm_name": "{{user `vm_name`}}",
         "headless": true,
 		"boot_wait": "1m",
         "boot_command": [
@@ -36,6 +37,7 @@
     "provisioners": [],
     "variables": {
         "output_directory": "./",
+        "vm_name": "",
         "iso_url": "",
         "iso_checksum_type": "",
         "iso_checksum": "",
