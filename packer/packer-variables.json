@@ -50,7 +50,7 @@
         }
     },
     "packer_variables": {
-        "output_directory": ".\\vm-output",
+        "output_directory": ".\\cyberavm-output",
         "iso_url": "",
         "iso_checksum_type": "",
         "iso_checksum": "",

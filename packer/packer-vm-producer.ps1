@@ -1,3 +1,14 @@
+<# 
+
+    CYBERANALYST VM PACKER PROVISIONING SCRIPT
+    Author: Diego Perez (@darkquassar)
+    Version: 1.0.0
+    Description: Provisioning Script for Windows 7, 10, Server 2012 and Server 2016 VM - Packer. 
+    By running this script you acknowledge that it's not provided with any guarantees and 
+    that you understand the regulations pertaining the software licenses that may be required 
+    by any of the softwares referenced by the script. 
+    
+#>
 
 function Start-BuildPackerTemplate {
 
@@ -62,7 +73,7 @@ function Start-BuildPackerTemplate {
         [System.Collections.ArrayList]$ProvisioningSequence,
 
         [Parameter(Mandatory=$false,Position=7)]
-        [string]$VMOutputDirectory=".\vm-output",
+        [string]$VMOutputDirectory=".\cyberavm-output",
 
         [Parameter(Mandatory=$false,Position=8)]
         [switch]$GenerateJsonOnly
@@ -112,12 +123,6 @@ function Start-BuildPackerTemplate {
     if(!(Test-Path $full_template_path)) {
         Write-LogFile -Message "Template $full_template_path is missing, please make sure you copy it to the right folder" -MessageType Info -WriteLogToStdOut
     }
-
-    # TODO: 
-    # Read template.json
-    # buiild provisioners as blocks, place blocks in a packer-provisioners.json file
-    # read variables from packer-variables to understand which things to run in the script phase. each phase separated by a restart: initial, choco packages, cleanup
-    # generate dynamic template this way, then execute, forget about packer variable shit
 
     # Read in Template
     Write-LogFile -Message "Reading Template $full_template_path" -MessageType Info -WriteLogToStdOut
@@ -176,14 +181,14 @@ function Start-BuildPackerTemplate {
     # Check if only a JSON file should be generated
     if ($GenerateJsonOnly) {
         $RandomUUID = [Guid]::newGuid()
-        $packer_template | ConvertTo-Json -Depth 32 | Out-File "packer-template-$RandomUUID.json" -Encoding Ascii -Force
+        $OutputFileName = "packer-template-$RandomUUID.json"
+        $packer_template | ConvertTo-Json -Depth 32 | Out-File $OutputFileName -Encoding Ascii -Force
         $packer_template | ConvertTo-Json -Depth 32
     }
     else {
-        # Build template with packer based on chosen options
-        # if the user chose to overload any variables provided in variables.json, they will be inserted in the commandline with $(if($Variables){$Variables})
-        
-        Start-Process -FilePath 'packer.exe' -ArgumentList "build  -var-file=variables.json -var `"os_name=$($osData.os_name)`" -var `"iso_checksum=$($osData.iso_checksum)`" -var `"iso_checksum_type=$($osData.iso_checksum_type)`" -var `"iso_url=$($osData.iso_url)`" -var `"guest_os_type=$($osData.guest_os_type.platform)`" $(if($Variables){$Variables}) .\$($vmsourcex)" -Wait -NoNewWindow
+
+        # Build template with packer based on chosen options        
+        Start-Process -FilePath 'packer.exe' -ArgumentList "build .\$OutputFileName" -Wait -NoNewWindow
     }
     
 
