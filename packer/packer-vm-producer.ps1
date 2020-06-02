@@ -1,12 +1,14 @@
 <# 
 
-    CYBERANALYST VM PACKER PROVISIONING SCRIPT
-    Author: Diego Perez (@darkquassar)
-    Version: 1.0.0
-    Description: Provisioning Script for Windows 7, 10, Server 2012 and Server 2016 VM - Packer. 
-    By running this script you acknowledge that it's not provided with any guarantees and 
-    that you understand the regulations pertaining the software licenses that may be required 
-    by any of the softwares referenced by the script. 
+    .SYNOPSIS
+        CYBERANALYSTVM PACKER PROVISIONING SCRIPT
+        Author: Diego Perez (@darkquassar)
+        Version: 1.0.0
+    .DESCRIPTION
+        Provisioning Script for Windows 7, 10, Server 2012 and Server 2016 VM - Packer. 
+        By running this script you acknowledge that it's not provided with any guarantees and 
+        that you understand the regulations pertaining the software licenses that may be required 
+        by any of the softwares referenced by the script. 
     
 #>
 
@@ -163,7 +165,9 @@ function Start-BuildPackerTemplate {
                     $packer_provisioners.$template_block.environment_vars = $packer_vars.environment_variables
                     $packer_template_provisioners.Add($packer_provisioners.$template_block) | Out-Null
                 }
-                catch {
+                catch [System.Management.Automation.SetValueInvocationException] {
+                    # If the provisioner does not have a "variables" block, append anyways and continue
+                    $packer_template_provisioners.Add($packer_provisioners.$template_block) | Out-Null
                     continue
                 }
                 

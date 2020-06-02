@@ -1,12 +1,17 @@
 <# 
 
-.SYNOPSIS
-    Provisioning Script for Windows 7, 10, Server 2012 and Server 2016 VM - Packer. 
-    By running this script you acknowledge that it's not provided with any guarantees and 
-    that you understand the regulations pertaining the software licenses that may be required 
-    by any of the softwares referenced by the script. 
-    
-    Diego Perez - THL - 2017
+    .SYNOPSIS
+        CYBERANALYSTVM PACKER PROVISIONING SCRIPT
+        Author: Diego Perez (@darkquassar)
+        Version: 1.0.0
+
+    .DESCRIPTION 
+        Provisioning Script for Windows 7, 10, Server 2012 and Server 2016 VM - Packer. 
+        By running this script you acknowledge that it's not provided with any guarantees and 
+        that you understand the regulations pertaining the software licenses that may be required 
+        by any of the softwares referenced by the script. 
+        
+        Diego Perez - THL - 2017
 #>
 
 function Start-DummyFunction {
@@ -267,7 +272,7 @@ function Start-Cleanup {
 
 function Invoke-RelaxProxy {
 
-    # Extracted from FLAREVM
+    # Ref: https://github.com/chocolatey/choco/wiki/Installation#installing-with-restricted-tls
     # Authorship of this snip goes to them
     # Set TLS 1.2 (3072), then TLS 1.1 (768), then TLS 1.0 (192), finally SSL 3.0 (48)
     # Use integers because the enumeration values for TLS 1.2 and TLS 1.1 won't

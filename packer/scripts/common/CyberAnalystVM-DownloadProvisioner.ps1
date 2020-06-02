@@ -10,7 +10,7 @@
 
 function Invoke-RelaxProxy {
 
-    # Extracted from FLAREVM
+    # Ref: https://github.com/chocolatey/choco/wiki/Installation#installing-with-restricted-tls
     # Authorship of this snip goes to them
     # Set TLS 1.2 (3072), then TLS 1.1 (768), then TLS 1.0 (192), finally SSL 3.0 (48)
     # Use integers because the enumeration values for TLS 1.2 and TLS 1.1 won't
