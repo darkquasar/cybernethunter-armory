@@ -103,6 +103,7 @@ function Disable-WindowsUpdates {
 }
 
 function Install-Chocolatey {
+
     Write-Host "Installing Chocolatey..." -ForegroundColor Green
     
     $chocoExePath = 'C:\ProgramData\Chocolatey\bin'
@@ -110,25 +111,42 @@ function Install-Chocolatey {
     # Use Windows native compression library rather than 7zip or other
     $env:chocolateyUseWindowsCompression = 'true'
 
-    if ($($env:Path).ToLower().Contains($($chocoExePath).ToLower())) { echo "Chocolatey found in PATH, skipping install..." ; Exit }
+    if ($($env:Path).ToLower().Contains($($chocoExePath).ToLower())) { 
+        Write-Host "Chocolatey found in PATH, skipping install..."
+        return 
+    }
 
     # Add to system PATH
     $systemPath = [Environment]::GetEnvironmentVariable('Path',[System.EnvironmentVariableTarget]::Machine)
     $systemPath += ';' + $chocoExePath
     [Environment]::SetEnvironmentVariable("PATH", $systemPath, [System.EnvironmentVariableTarget]::Machine)
 
-    # Update local process' path
+    # Update local user path
     $userPath = [Environment]::GetEnvironmentVariable('Path',[System.EnvironmentVariableTarget]::User)
     if($userPath) { $env:Path = $systemPath + ";" + $userPath } 
     else { $env:Path = $systemPath }
 
     # Run the Chocolatey installer
-    iex ((New-Object Net.Webclient).DownloadString('https://chocolatey.org/install.ps1'))
-    
+    try {
+        Invoke-Expression ((New-Object Net.Webclient).DownloadString('https://chocolatey.org/install.ps1'))
+    }
+    catch {
+        Write-Host "Could not install Chocolatey with current Certificate Checking configuration. Trying to relax Cert checking..." -ForegroundColor Green
+
+        try {
+            Invoke-RelaxProxy
+            Invoke-Expression ((New-Object Net.Webclient).DownloadString('https://chocolatey.org/install.ps1'))
+        }
+        catch {
+            Write-Host "Could not install Chocolatey" -ForegroundColor Green
+        }
+    }
+        
     return
 }
 
 function Install-ChocoPackages {
+
     Write-Host "Installing Selected Chocolatey Packages..." -ForegroundColor Green
     Write-Host "Debugging status of environment variables" 
     
@@ -241,6 +259,38 @@ function Start-Cleanup {
     Start-Process -FilePath "$env:comspec" -ArgumentList "/c reg add ""HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"" /v AutoAdminLogon /d 0 /f" -NoNewWindow -Wait
     
     # Removing Files in C:\Windows\Temp
-    Get-ChildItem "C:\Windows\Temp" | where {$_.Mode -match "d-"} | Remove-Item -Recurse -Force
+    Get-ChildItem "C:\Windows\Temp" | Where-Object {$_.Mode -match "d-"} | Remove-Item -Recurse -Force
     if(Test-Path "C:\Windows\Temp\vmWareTools.iso") {Get-Item "C:\Windows\Temp\vmWareTools.iso" | Remove-Item -Force}
+}
+
+function Invoke-RelaxProxy {
+
+
+    # Proxies are too uptight and create problems with Powershell and trusted certs :)
+    # Allow current PowerShell session to trust all certificates. Ref: https://stackoverflow.com/questions/11696944/powershell-v3-invoke-webrequest-https-error
+    try {
+
+        Add-Type @"
+        using System.Net;
+        using System.Security.Cryptography.X509Certificates;
+        public class TrustAllCertsPolicy : ICertificatePolicy {
+            public bool CheckValidationResult(
+            ServicePoint srvPoint, X509Certificate certificate,
+            WebRequest request, int certificateProblem) {
+            return true;
+            }
+        }
+"@
+    } 
+    catch {
+        Write-Host "Could not configure System.Security.Cryptography.X509Certificates"
+    }
+
+    try {
+        # Trust all certificates
+        [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+    }
+    catch {
+        Write-Host "Failed to Trust All Certs" -ForegroundColor Green
+    }
 }

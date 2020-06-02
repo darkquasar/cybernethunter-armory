@@ -8,6 +8,7 @@
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
         "inline": [
+            "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
             ". A:\\CyberAnalystVM-Banner.ps1 ; Show-Banner"
         ]
     },    
@@ -16,8 +17,8 @@
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
         "inline": [
-            ". A:\\CyberAnalystVM-DownloadProvisioner.ps1 ; $ProvisioningScript = Start-DownloadCyberAnalystVMProvisioner",
             "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
+            ". A:\\CyberAnalystVM-DownloadProvisioner.ps1 ; $ProvisioningScript = Start-DownloadCyberAnalystVMProvisioner",
             "Invoke-Expression $ProvisioningScript",
             "Start-ConfigureGenerics",
             "Start-Job -Name DisableWindowsUpdates -ScriptBlock { Invoke-Expression $using:ProvisioningScript ; Disable-WindowsUpdates } | Wait-Job | Receive-Job -Wait",
@@ -30,9 +31,8 @@
         "elevated_user": "vagrant",
         "elevated_password": "vagrant",
         "inline": [
-            ". A:\\CyberAnalystVM-DownloadProvisioner.ps1 ; $ProvisioningScript = Start-DownloadCyberAnalystVMProvisioner",
             "Set-ExecutionPolicy -ExecutionPolicy Bypass -Force",
-            "Invoke-Expression $ProvisioningScript",
+            ". A:\\CyberAnalystVM-DownloadProvisioner.ps1",
             "Invoke-RelaxProxy",
             "Install-ChocoPackages"
         ],
