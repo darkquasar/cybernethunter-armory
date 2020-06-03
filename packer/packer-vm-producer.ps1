@@ -27,21 +27,17 @@ function Start-BuildPackerTemplate {
         NOTE: By default, the "variables.json" file points to empty values for "iso_url", "iso_checksum" and "iso_checksum_type". These are overloaded by the current script when selecting a particular platform
     
     .EXAMPLE 1
-        Build a Windows 2012 R2 from an ISO for VMWare, using the defaults (ISO file will be downloaded from the internet) and other variables coded in "variables.json"
+        Build a Windows Server 2016 VM from an ISO for VMWare, using the defaults (ISO file will be downloaded from the internet). Specify a provisioning sequence base off the blocks in packer-provisioners.json
         
-        Build-Template -Platform vmware -OSType windows -OSName Win2012R2 -VMSource iso
+        Start-BuildPackerTemplate -Platform vmware -OSType windows -OSName Win2016StdCore -VMSource iso -ProvisioningSequence @("show-banner", "prepare", "restart", "process", "cleanup")
         
     .EXAMPLE 2
-        Build a Windows 7 VM from an ISO for VMWare specifying the location of the ISO and associated paramaters.
+        Build a Windows 7 VM from an ISO for VirtualBox, only generate the JSON template, do not start packer to create the VM.
 
-        Build-Template -Platform vmware -OSType windows -OSName Win7 -VMSource iso -Variables '-var iso_url=C:/D13g0/VirtualMachines/ISO/7600.16385.090713-1255_x64fre_enterprise_en-us_EVAL_Eval_Enterprise-GRMCENXEVAL_EN_DVD.iso -var iso_checksum_type=sha256 -var iso_checksum=B202E27008FD2553F226C0F3DE4DD042E4BB7AE93CFC5B255BB23DC228A1B88E -var output_directory=P:/vmware-win7-test -var install_windowsupdates=True -var install_openssh=False -var install_firefox=False -var install_chrome=False'
+        Start-BuildPackerTemplate -Platform vbox -OSType windows -OSName Win7 -VMSource iso -ProvisioningSequence @("show-banner", "prepare", "restart", "process", "cleanup") -GenerateJsonOnly
     
-    .EXAMPLE 3
-        Build a Windows 2012 R2 from a VMWare VMX (existing VM machine) and install Windows Updates plus FLAREVM tools but no openssh. Specify a different output folder (output_directory) and explicitly select the source folder (source_path).
-
-        Build-Template -Platform vmware -OSType windows -OSName Win2012R2 -VMSource vmx -Variables '-var source_path=./output-vmware-iso/packer-vmware-iso.vmx -var output_directory=P:/vmware-vmx-test -var install_windowsupdates=True -var install_flarevm=True -var install_openssh=False'
         
-    .EXAMPLE
+    .EXAMPLE 3
         asdf
         
         
@@ -293,7 +289,7 @@ Function Write-LogFile {
             else {
                 $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
                 $RandomSuffix = Get-Random
-                $Global:strLogFile = "$OutputDir\$($env:computername)-packer-vm-producer-$strTimeNow-$RandomSuffix.log"
+                $Global:strLogFile = "$OutputDir\$($env:computername)-cyberanalystvm-$strTimeNow-$RandomSuffix.log"
             }
         }
         
@@ -306,7 +302,7 @@ Function Write-LogFile {
             
             $Global:objDiskFileStream = New-Object -TypeName System.IO.StreamWriter -ArgumentList $strLogFile
             
-            Return
+            return
         }
 
         elseif ($InitializeLogFile -eq 'Memory') {
@@ -314,10 +310,7 @@ Function Write-LogFile {
             $Global:MemStream = New-Object -TypeName System.IO.MemoryStream
             $Global:StreamWritter = New-Object -TypeName System.IO.StreamWriter -ArgumentList $MemStream
             $Global:StreamWritter.AutoFlush = 1
-            #$Global:objMemoryFileStream = [System.IO.FileStream]::new($Global:strLogFile, [System.IO.FileMode]::OpenOrCreate)
-
-            Return
-
+            return
         }
 
         # Grabing Time in UTC
@@ -356,6 +349,9 @@ Function Write-LogFile {
             }
         }
 
+        # Generating stdout friendly output
+        $strLogLineFriendly = "$($strLogLine.timestamp) - $MessageType - $($strLogLine.hostname) - $($strLogLine.message)"
+
         # Converting log line to JSON
 
         if (!$LogAsIs) {
@@ -366,8 +362,6 @@ Function Write-LogFile {
                 $strLogLine = $strLogLine | ConvertTo-Json -Compress
             }
         }
-
-
 
         # Choosing the right StdOut Colors in case we need them
         Switch ($MessageType) {
@@ -387,14 +381,6 @@ Function Write-LogFile {
             "Special" {
                 $MessageColor = "White"
                 $BackgroundColor = "Red"
-            }
-            "RemoteLog" {
-                $MessageColor = "DarkGreen"
-                $BackgroundColor = "Green"
-            }
-            "Rare" {
-                $MessageColor = "Black"
-                $BackgroundColor = "White"
             }
         }
 
@@ -416,13 +402,13 @@ Function Write-LogFile {
         if ($Host.UI.RawUI -eq "System.Management.Automation.Internal.Host.InternalHostRawUserInterface") {
 
             if ($Global:LogfileWriteConsole -or $WriteLogToStdOut) {
-                Write-Output $strLogLine
+                Write-Output $strLogLineFriendly
             }
         }
         # Running from a .NET PS console v3 to v5
         else {
             if ($Global:LogfileWriteConsole -or $WriteLogToStdOut) {
-                Write-Host $strLogLine -ForegroundColor $MessageColor -BackgroundColor $BackgroundColor
+                Write-Host $strLogLineFriendly -ForegroundColor $MessageColor -BackgroundColor $BackgroundColor
             }
         }
     }
