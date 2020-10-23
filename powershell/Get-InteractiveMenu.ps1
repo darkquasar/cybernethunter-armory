@@ -1,9 +1,11 @@
-# SECURITY OPERATIONS SCRIPTING
-# Author: Diego Perez
-# Version: 1.0.0
-# Module: Get-InteractiveMenu.ps1
-# Description: This module generates an interactive menu from passed variables.
-# Ref: https://github.com/chrisseroka/ps-menu/blob/master/ps-menu.psm1
+<#
+    CYBRHUNTER SECURITY OPERATIONS ARMORY
+    Author: Diego Perez
+    Version: 1.3.0
+    Module: Get-InteractiveMenu.ps1
+    Description: This module generates an interactive menu from passed variables.
+    Ref: https://github.com/chrisseroka/ps-menu/blob/master/ps-menu.psm1
+#>
 
 Function Start-DrawMenu {
 
