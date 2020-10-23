@@ -49,7 +49,7 @@
     }
   ],
   "variables": {
-    "iso_url": "C:\\CGI_D13g0\\VirtualMachines\\ISO\\9600.17050.W2012R2.ISO",
+    "iso_url": "C:\\D13g0\\VirtualMachines\\ISO\\9600.17050.W2012R2.ISO",
     "iso_checksum_type": "sha256",
     "iso_checksum": "6612B5B1F53E845AACDF96E974BB119A3D9B4DCB5B82E65804AB7E534DC7B4D5",
     "autounattend": "./scripts/Autounattend.xml"
