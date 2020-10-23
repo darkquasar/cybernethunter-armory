@@ -2,7 +2,7 @@
     CYBRHUNTER SECURITY OPERATIONS ARMORY
     Author: Diego Perez
     Version: 2.0.0
-    Module: Get-InteractiveMenu.ps1
+    Module: Get-KerberosTickets
     Description: Module to extract Kerberos Ticket Granting Tickets from LSA
     Ref: Minimally adapted from Jared Atkinson's script https://gist.github.com/jaredcatkinson/c95fd1e4e76a4b9b966861f64782f5a9
 #>
@@ -11,7 +11,7 @@
 if ($MyInvocation.MyCommand.Name) { 
     $Global:ScriptPath = New-Object -TypeName System.IO.DirectoryInfo -ArgumentList $(Split-Path -Parent $MyInvocation.MyCommand.Definition)
 
-} 
+}
 else {
     $Global:ScriptPath = New-Object -TypeName System.IO.DirectoryInfo -ArgumentList $(Get-Location)
 }
