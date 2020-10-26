@@ -2548,7 +2548,7 @@ Function Start-DumpKerberosTicketsMetadata {
     ForEach ($ticket in $tgt) {
 
         $ObjDict = @{}
-        $ticket.psobject.properties | Foreach-Object { $ObjDict[$_.Name] = $_.Value.ToString() }
+        $ticket.psobject.properties | Foreach-Object { $ObjDict[$_.Name] = ($_.Value | Out-String) }
         
         if ($DumpTicketToFile) {
             ConvertTo-Json $ObjDict | Out-File -Append $OutputFilePath

@@ -1,10 +1,10 @@
 <#
-# SECURITY OPERATIONS SCRIPT
-# Author: Diego Perez
-# Version: 1.0.7
-# Module: Get-SOCHelperScripts.ps1
-# Description: This module contains a variety of functions to help with common tasks like creating new folders, zipping files, searching Active Directory without the RSAT module (leveraging plain .NET or ADSI), and managing Scheduled Tasks.
-# Ref.: This script was adapted from code in CybrHunter.
+    BUPA SECURITY OPERATIONS :)
+    Author: Diego Perez
+    Version: 1.0.7
+    Module: Get-SOCHelperScripts
+    Description: This module contains a variety of functions to help with common tasks like creating new folders, zipping files, searching Active Directory without the RSAT module (leveraging plain .NET or ADSI), and managing Scheduled Tasks.
+    Ref.: This script was adapted from code in CybrHunter (https://github.com/darkquasar/cybrhunter-armory/blob/master/powershell/Get-InteractiveMenu.ps1).
 #>
 
 
@@ -67,6 +67,93 @@ namespace CybrHunter {
 
 # ***** SETUP SOME GLOBAL VARS ***** ##
 
+function Convert-LDAPProperty {
+    <#
+    .SYNOPSIS
+
+    Helper that converts specific LDAP property result fields and outputs
+    a custom psobject.
+
+    Author: Will Schroeder (@harmj0y)
+    License: BSD 3-Clause
+    Required Dependencies: None
+
+    .DESCRIPTION
+
+    Converts a set of raw LDAP properties results from ADSI/LDAP searches
+    into a proper PSObject. Used by several of the Get-Net* function.
+
+    .PARAMETER Properties
+
+    Properties object to extract out LDAP fields for display.
+
+    .OUTPUTS
+
+    System.Management.Automation.PSCustomObject
+
+    A custom PSObject with LDAP hashtable properties translated.
+    #>
+
+    [OutputType('System.Management.Automation.PSCustomObject')]
+    [CmdletBinding()]
+    Param(
+        [Parameter(Mandatory = $True, ValueFromPipeline = $True)]
+        [ValidateNotNullOrEmpty()]
+        $Properties
+    )
+
+    $ObjectProperties = @{}
+
+    $Properties.PropertyNames | ForEach-Object {
+        if (($_ -eq 'objectsid') -or ($_ -eq 'sidhistory')) {
+            # convert the SID to a string
+            $ObjectProperties[$_] = (New-Object System.Security.Principal.SecurityIdentifier($Properties[$_][0], 0)).Value
+        }
+        elseif ($_ -eq 'objectguid') {
+            # convert the GUID to a string
+            $ObjectProperties[$_] = (New-Object Guid (,$Properties[$_][0])).Guid
+        }
+        elseif ($_ -eq 'ntsecuritydescriptor') {
+            $ObjectProperties[$_] = New-Object Security.AccessControl.RawSecurityDescriptor -ArgumentList $Properties[$_][0], 0
+        }
+        elseif ( ($_ -eq 'lastlogon') -or ($_ -eq 'lastlogontimestamp') -or ($_ -eq 'pwdlastset') -or ($_ -eq 'lastlogoff') -or ($_ -eq 'badPasswordTime') ) {
+            # convert timestamps
+            if ($Properties[$_][0] -is [System.MarshalByRefObject]) {
+                # if we have a System.__ComObject
+                $Temp = $Properties[$_][0]
+                [Int32]$High = $Temp.GetType().InvokeMember('HighPart', [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                [Int32]$Low  = $Temp.GetType().InvokeMember('LowPart',  [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                $ObjectProperties[$_] = ([datetime]::FromFileTime([Int64]("0x{0:x8}{1:x8}" -f $High, $Low)))
+            }
+            else {
+                # otherwise just a string
+                $ObjectProperties[$_] = ([datetime]::FromFileTime(($Properties[$_][0])))
+            }
+        }
+        elseif ($Properties[$_][0] -is [System.MarshalByRefObject]) {
+            # try to convert misc com objects
+            $Prop = $Properties[$_]
+            try {
+                $Temp = $Prop[0]
+                Write-Verbose $_
+                [Int32]$High = $Temp.GetType().InvokeMember('HighPart', [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                [Int32]$Low  = $Temp.GetType().InvokeMember('LowPart',  [System.Reflection.BindingFlags]::GetProperty, $null, $Temp, $null)
+                $ObjectProperties[$_] = [Int64]("0x{0:x8}{1:x8}" -f $High, $Low)
+            }
+            catch {
+                $ObjectProperties[$_] = $Prop[$_]
+            }
+        }
+        elseif ($Properties[$_].count -eq 1) {
+            $ObjectProperties[$_] = $Properties[$_][0]
+        }
+        else {
+            $ObjectProperties[$_] = $Properties[$_]
+        }
+    }
+
+    New-Object -TypeName PSObject -Property $ObjectProperties
+}
 Function Get-HostChecks {
 
     <#
@@ -1244,10 +1331,13 @@ Function Find-ADAccount {
             $PropDict = New-Object System.Collections.Specialized.OrderedDictionary
             # The DirectoryEntry is a collection of System.Data.PropertyCollection
             # We need to add each key/value pairs to a dict
-            $objADAccountEntry.Properties.Keys | ForEach-Object { $PropDict.Add($_, $objADAccountEntry.$_) }
+            #$objADAccountEntry.Properties.Keys | ForEach-Object { $PropDict.Add($_, $objADAccountEntry.$_) }
+            $ConvertedLDAPProperties = $objADAccountEntry.Properties | Convert-LDAPProperty -ErrorAction SilentlyContinue
+            $ConvertedLDAPProperties.PSObject.Properties.Name | Sort-Object | ForEach-Object { $LDAPPropName = $_ ; $PropDict.Add($LDAPPropName, $ConvertedLDAPProperties.$LDAPPropName) }
             return $PropDict
         }
         else {
+            $ConvertedLDAPProperties = $objADAccountEntry.Properties | Convert-LDAPProperty -ErrorAction SilentlyContinue | Sort-Object Name
             return $objADAccountEntry
         }
         
