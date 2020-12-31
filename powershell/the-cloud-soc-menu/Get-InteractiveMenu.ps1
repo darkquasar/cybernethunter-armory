@@ -1,7 +1,7 @@
-<#
-    CYBRHUNTER SECURITY OPERATIONS ARMORY
-    Author: Diego Perez
-    Version: 1.3.0
+<# 
+    CYBRHUNTER SECURITY OPERATIONS :)
+    Author: Diego Perez (@darkquassar)
+    Version: 1.0.0
     Module: Get-InteractiveMenu.ps1
     Description: This module generates an interactive menu from passed variables.
     Ref: https://github.com/chrisseroka/ps-menu/blob/master/ps-menu.psm1
@@ -52,34 +52,6 @@ Function Start-DrawMenu {
 
 Function New-Menu {
 
-    <#
-
-    .SYNOPSIS
-        Function to create new menus based on an array and a main array selector.
-
-    .DESCRIPTION
-        This function will allow you to display a new menu based on an attribute of an array which is used as the selector. You can pass a "ChoiceAction" parameter with a scriptblock that gets executed upon selection on an option in the menu. Alternatively, it can return a particular value from the provided array.
-
-    .PARAMETER MenuItems
-        An array of key/value pairs
-
-    .PARAMETER MenuArrayListSelector
-        The key used to create the menu options from
-
-    .PARAMETER ChoiceAction
-        A scriptblock that runs upon selection of an option
-
-    .PARAMETER ReturnValueName
-        The name of the key whose value is to be returned upon selection of an option
-
-    .PARAMETER ProvideOptionDescription
-        This switch tells the script to read a "description" key from within the passed array to display it back to the user below the options. Your array must contain one key with the name "description" for this to work.
-
-    .EXAMPLE
-        Todo
-
-    #>
-
     Param (
         
         [Parameter(Mandatory=$True)]
@@ -101,22 +73,13 @@ Function New-Menu {
         [string]$ReturnValueName,        
 
         [Parameter(Mandatory=$False)]
-        [switch]$ProvideOptionDescription
+        [switch]$ReadPowershellScriptDescription
 
     )
 
-    $SOCBanner = @'
+    $SOCBanner = '
 
 
-     _____       _          _   _             _            
-    /  __ \     | |        | | | |           | |           
-    | /  \/_   _| |__  _ __| |_| |_   _ _ __ | |_ ___ _ __ 
-    | |   | | | | '_ \| '__|  _  | | | | '_ \| __/ _ \ '__|
-    | \__/\ |_| | |_) | |  | | | | |_| | | | | ||  __/ |   
-     \____/\__, |_.__/|_|  \_| |_/\__,_|_| |_|\__\___|_|   
-            __/ |                                          
-           |___/                                           
-    
 
                   |\                     /)
                 /\_\\__               (_//
@@ -134,9 +97,9 @@ Function New-Menu {
                          //   `   \\
                         |/         \\ 
                                                   
-                  CYBRHUNTER SCRIPTS ARMORY
+        CYBRHUNTER SECURITY OPERATIONS SCRIPTS ARMORY
 
-'@
+ '
     Clear-Host
     Write-Host $SOCBanner -ForegroundColor Green
 
@@ -173,7 +136,7 @@ Function New-Menu {
                 [System.Console]::SetCursorPosition(0, $CursorPosition)
                 Start-DrawMenu $SelectedMenuItemsList $Position $Multiselect $Selection
 
-                if ($ProvideOptionDescription) {
+                if ($ReadPowershellScriptDescription) {
                     Write-Host "`n"
                     $ScriptDescription = $MenuItems[$Position].Description
                     Write-Host "   $ScriptDescription" -ForegroundColor Yellow

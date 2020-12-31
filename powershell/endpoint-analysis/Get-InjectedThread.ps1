@@ -1,5 +1,5 @@
 <#
-    CYBRHUNTER SECURITY OPERATIONS ARMORY
+    CYBRHUNTER SECURITY OPERATIONS :)
     Author: Jared Atkinson
     Version: 1.0.0
     Module: Get-InjectedThread
