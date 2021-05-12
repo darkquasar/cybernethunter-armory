@@ -1,5 +1,5 @@
 <#
-    CYBRHUNTER SECURITY OPERATIONS ARMORY
+    CYBERNETHUNTER SECURITY OPERATIONS ARMORY
     Author: Diego Perez
     Version: 2.0.0
     Module: Get-KerberosTickets
@@ -1606,13 +1606,13 @@ function Get-KerberosTicketGrantingTicket
                             
                             if ($Global:OnlyReturnTicketHashes) {
 
-                                # CybrHunter Addendum
+                                # CYBERNETHUNTER Addendum
                                 # Hashing the SessionKey so that we only return this property and avoid storing the actual session key
                                 $NewHashAlgorithm = [System.Security.Cryptography.HashAlgorithm]::Create("SHA256")
                                 $SessionKeySHA256Bytes = $NewHashAlgorithm.ComputeHash($SessionKey)
                                 $SessionKeySHA256Hex = -join ([byte[]] $SessionKeySHA256Bytes).ForEach('ToString', 'X2')
 
-                                # CybrHunter Addendum
+                                # CYBERNETHUNTER Addendum
                                 # Hashing the EncodedTicket so that we only return this property and avoid storing the actual ticket
                                 $NewHashAlgorithm = [System.Security.Cryptography.HashAlgorithm]::Create("SHA256")
                                 $EncodedTicketSHA256Bytes = $NewHashAlgorithm.ComputeHash($EncodedTicket)

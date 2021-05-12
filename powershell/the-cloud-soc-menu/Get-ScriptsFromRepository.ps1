@@ -1,5 +1,5 @@
 <#
-    CYBRHUNTER SECURITY OPERATIONS :)
+    CYBERNETHUNTER SECURITY OPERATIONS :)
     Author: Diego Perez (@darkquassar)
     Version: 1.3.0
     Created: 15/04/2018
@@ -101,7 +101,7 @@ Function New-Menu {
                          //   `   \\
                         |/         \\ 
                                                   
-        CYBRHUNTER SECURITY OPERATIONS SCRIPTS ARMORY
+        CYBERNETHUNTER SECURITY OPERATIONS SCRIPTS ARMORY
 
  '
     Clear-Host
@@ -358,7 +358,7 @@ Function Get-ScriptsFromRepository {
     }
 
     # List Scripts
-    $RepoScriptsList = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "cybrhunter" -RepoName "CyberOps" -APIOperation list_directory_contents -FilePath "\analyst_scripts\powershell"
+    $RepoScriptsList = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "CYBERNETHUNTER" -RepoName "CyberOps" -APIOperation list_directory_contents -FilePath "\analyst_scripts\powershell"
     $PowershellScriptList = $RepoScriptsList | Where-Object {$_.Value.Path -LIKE "*powershell/*"}
 
     # Instantiating an ArrayList that will hold all of our dictionary entries
@@ -388,7 +388,7 @@ Function Get-ScriptsFromRepository {
         }
 
         # Get the script Description if any
-        $ScriptContents = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "cybrhunter" -RepoName "CyberOps" -APIOperation get_file_contents -FilePath $Item.Path
+        $ScriptContents = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "CYBERNETHUNTER" -RepoName "CyberOps" -APIOperation get_file_contents -FilePath $Item.Path
         $RegExOptions = [System.Text.RegularExpressions.RegexOptions]::Singleline
         $Pattern = [Regex]::new('\<\#(.*?)\#\>', $RegExOptions)
         
@@ -434,14 +434,14 @@ Function Get-ScriptsFromRepository {
 
         [scriptblock]$MenuAction = {
 
-            $ScriptContents = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "cybrhunter" -RepoName "CyberOps" -APIOperation get_file_contents -FilePath $MenuItems[$Position].Path
+            $ScriptContents = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "CYBERNETHUNTER" -RepoName "CyberOps" -APIOperation get_file_contents -FilePath $MenuItems[$Position].Path
 
             Invoke-Expression $ScriptContents
         }
 
         $MenuSelectionValue = New-Menu -MenuItems $OpsFunctionsDict -MenuArrayListSelector "Script" -ReadPowershellScriptDescription -ReturnValueName "Path"
 
-        $ScriptContents = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "cybrhunter" -RepoName "CyberOps" -APIOperation get_file_contents -FilePath $MenuSelectionValue
+        $ScriptContents = Invoke-AzureDevOpsAPI -PersonalAccessToken $PAT -AzureDevOpsProjectName "CYBERNETHUNTER" -RepoName "CyberOps" -APIOperation get_file_contents -FilePath $MenuSelectionValue
         $ScriptToRun = [scriptblock]::Create($ScriptContents)
 
         New-Module -ScriptBlock $ScriptToRun | Out-Null

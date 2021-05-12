@@ -13,7 +13,7 @@ This contains a list of general purpose scripts
 
 #### CommonUtils.ps1
 
-* Source: CybrHunter (this repo)
+* Source: CYBERNETHUNTER (this repo)
 * Author: Diego Perez
 * Purpose: some general functions like compression/de-compression of in-memory bytearrays, zipping files, querying AD, etc. 
 

@@ -1,5 +1,5 @@
 <# 
-    CYBRHUNTER SECURITY OPERATIONS :)
+    CYBERNETHUNTER SECURITY OPERATIONS :)
     Author: Diego Perez (@darkquassar)
     Version: 1.0.0
     Module: Get-InteractiveMenu.ps1
@@ -97,7 +97,7 @@ Function New-Menu {
                          //   `   \\
                         |/         \\ 
                                                   
-        CYBRHUNTER SECURITY OPERATIONS SCRIPTS ARMORY
+        CYBERNETHUNTER SECURITY OPERATIONS SCRIPTS ARMORY
 
  '
     Clear-Host

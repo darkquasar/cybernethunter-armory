@@ -1,5 +1,5 @@
 <#
-    CYBRHUNTER SECURITY OPERATIONS :)
+    CYBERNETHUNTER SECURITY OPERATIONS :)
     Author: Diego Perez (@darkquassar)
     Version: 1.0.0
     Module: Invoke-BenevolentPowerView.ps1

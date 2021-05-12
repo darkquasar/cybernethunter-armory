@@ -1,10 +1,10 @@
 <#
-    CYBRHUNTER SECURITY OPERATIONS :)
+    CYBERNETHUNTER SECURITY OPERATIONS :)
     Author: Diego Perez (@darkquassar)
     Version: 1.0.7
     Module: Get-SOCHelperScripts
     Description: This module contains a variety of functions to help with common tasks like creating new folders, zipping files, searching Active Directory without the RSAT module (leveraging plain .NET or ADSI), and managing Scheduled Tasks.
-    Ref.: This script was adapted from code in CybrHunter (https://github.com/darkquasar/cybrhunter-armory/blob/master/powershell/Get-InteractiveMenu.ps1).
+    Ref.: This script was adapted from code in CYBERNETHUNTER (https://github.com/darkquasar/CYBERNETHUNTER-armory/blob/master/powershell/Get-InteractiveMenu.ps1).
 #>
 
 # *** Getting a handle to the running script path so that we can refer to it *** #
@@ -25,7 +25,7 @@ To use it
 
     (2) We now need to start this process using a .NET Task handler so that it doesn't block the main script's thread
     The object stored here is of type System.Threading.Tasks.TaskCompletionSource
-    [System.Threading.Tasks.TaskCompletionSource[int]]$ProcessTask = [CybrHunter.BackgroundProcess]::RunProcessAsyncP($objProcess)
+    [System.Threading.Tasks.TaskCompletionSource[int]]$ProcessTask = [CYBERNETHUNTER.BackgroundProcess]::RunProcessAsyncP($objProcess)
 #>
 
 if ($PSVersionTable.PSVersion.Major -ne 2) {
@@ -36,7 +36,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 
-namespace CybrHunter {
+namespace CYBERNETHUNTER {
 
     public class BackgroundProcess {
 
