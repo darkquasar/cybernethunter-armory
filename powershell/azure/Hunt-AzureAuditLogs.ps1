@@ -11,12 +11,20 @@ using namespace System.IO
 class TimeStamp {
 
     # Public Properties
-    [String] $DateTime
     [Int32] $Interval
     [System.Globalization.CultureInfo] $AUCulture
     [DateTime] $ParsedDate
     [DateTime] $StartTimeSlice
     [DateTime] $EndTimeSlice
+    [DateTime] $ParsedDateUTC
+    [DateTime] $StartTimeSliceUTC
+    [DateTime] $EndTimeSliceUTC
+
+    # Default, Overloaded Constructor
+    TimeStamp([String] $TimeStamp) {
+        $this.AUCulture = New-Object System.Globalization.CultureInfo("en-AU")
+        $this.ParseDateString($TimeStamp)
+    }
 
     # Default, Parameterless Constructor
     TimeStamp() {
@@ -26,6 +34,7 @@ class TimeStamp {
     # Constructor
     ParseDateString ([String] $TimeStamp) {
         $this.ParsedDate = [DateTime]::ParseExact($TimeStamp, $this.AUCulture.DateTimeFormat.SortableDateTimePattern, $null)
+        $this.UpdateUTCTimestamp()
     }
 
     IncrementTimeSlice ([float] $HourlySlice) {
@@ -39,6 +48,12 @@ class TimeStamp {
             $this.StartTimeSlice = $this.EndTimeSlice
             $this.EndTimeSlice = $this.StartTimeSlice.AddHours($HourlySlice)
         }
+    }
+
+    [void]UpdateUTCTimestamp () {
+        $this.ParsedDateUTC = $this.ParsedDate.ToUniversalTime()
+        $this.StartTimeSliceUTC = $this.StartTimeSlice.ToUniversalTime()
+        $this.EndTimeSliceUTC = $this.EndTimeSlice.ToUniversalTime()
     }
 }
 
