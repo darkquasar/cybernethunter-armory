@@ -1,7 +1,7 @@
-# CybrHunter Armory - The Analyst Scrolls
+# CyberNetHunter Armory - The Security Analyst Magic Scrolls
 
 ## Purpose
-The Analyst Scrolls is a section that contains a wide range of wizardry from powershell scrolls to python incantations. They are here for the travellers and magiciands that know where to look and want to expand their tradecraft.
+The **CyberNetHunter Armory** is a section that contains a wide range of wizardry from powershell scrolls to python incantations. They are here for the travellers and magicians that know where to look and want to expand their tradecraft.
 
 # Magic Scrolls List
 
