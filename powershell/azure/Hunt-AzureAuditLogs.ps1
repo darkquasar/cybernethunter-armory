@@ -12,7 +12,8 @@ class TimeStamp {
 
     # Public Properties
     [float] $Interval
-    [System.Globalization.CultureInfo] $AUCulture
+    [bool] $IntervalAdjusted
+    [System.Globalization.CultureInfo] $Culture
     [DateTime] $StartTime
     [DateTime] $EndTime
     [DateTime] $StartTimeSlice
@@ -24,7 +25,7 @@ class TimeStamp {
 
     # Default, Overloaded Constructor
     TimeStamp([String] $StartTime, [String] $EndTime) {
-        $this.AUCulture = New-Object System.Globalization.CultureInfo("en-AU")
+        $this.Culture = New-Object System.Globalization.CultureInfo("en-AU")
         $this.StartTime = $this.ParseDateString($StartTime)
         $this.EndTime = $this.ParseDateString($EndTime)
         $this.UpdateUTCTimestamp()
@@ -32,12 +33,12 @@ class TimeStamp {
 
     # Default, Parameterless Constructor
     TimeStamp() {
-        $this.AUCulture = New-Object System.Globalization.CultureInfo("en-AU")
+        $this.Culture = New-Object System.Globalization.CultureInfo("en-AU")
     }
 
     # Constructor
     [DateTime]ParseDateString ([String] $TimeStamp) {
-        return [DateTime]::ParseExact($TimeStamp, $this.AUCulture.DateTimeFormat.SortableDateTimePattern, $null)
+        return [DateTime]::ParseExact($TimeStamp, $this.Culture.DateTimeFormat.SortableDateTimePattern, $null)
     }
 
     Reset() {
@@ -49,8 +50,8 @@ class TimeStamp {
 
         $this.Interval = $HourlySlice
 
-        # if running method for the first time, configure $StartTimeSlice with the $ParsedDate
-        if(($this.StartTimeSlice -lt $this.StartTime) -and ($this.EndTimeSlice -lt $this.StartTime)) {
+        # if running method for the first time, set $StartTimeSlice to $StartTime
+        if(($this.StartTimeSlice -le $this.StartTime) -and ($this.EndTimeSlice -lt $this.StartTime)) {
             $this.StartTimeSlice = $this.StartTime
             $this.EndTimeSlice = $this.StartTime.AddHours($HourlySlice)
         }
@@ -88,17 +89,18 @@ class Logger {
 
     #>
 
-    [Hashtable]$Dictionary
+    [Hashtable] $Dictionary
     [ValidateSet('DEBUG','ERROR','LOW','INFO','SPECIAL','REMOTELOG')]
-    [string]$MessageType
-    [string]$CallingModule = $( if(Get-PSCallStack){ $(Get-PSCallStack)[1].FunctionName } else {"NA"} )
-    [string]$ScriptPath
-    [string]$LogFileJSON
-    [string]$LogFileTXT
-    [string]$MessageColor
-    [string]$BackgroundColor
+    [string] $MessageType
+    [string] $CallingModule = $( if(Get-PSCallStack){ $(Get-PSCallStack)[1].FunctionName } else {"NA"} )
+    [string] $ScriptPath
+    [string] $LogFileJSON
+    [string] $LogFileTXT
+    [string] $MessageColor
+    [string] $BackgroundColor
     $Message
-    [string]$LogRecordStdOut
+    [string] $LogRecordStdOut
+    [string] $strTimeNow
 
     Logger () {
 
@@ -110,9 +112,9 @@ class Logger {
             $this.ScriptPath = [System.IO.DirectoryInfo]::new([Directory]::GetCurrentDirectory())
         }
 
-        $strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
-        $this.LogFileJSON = "$($this.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$strTimeNow.json"
-        $this.LogFileTXT = "$($this.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$strTimeNow.txt"
+        $this.strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
+        $this.LogFileJSON = "$($this.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$($this.strTimeNow).json"
+        $this.LogFileTXT = "$($this.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$($this.strTimeNow).txt"
     }
 
     LogMessage([string]$Message, [string]$MessageType, [Hashtable]$Dictionary, [System.Management.Automation.ErrorRecord]$LogErrorMessage) {
@@ -440,57 +442,77 @@ Function Search-AzureCloudUnifiedLog {
         
         while($TimeSlicer.StartTimeSlice -le $TimeSlicer.EndTime) {
 
-            # do things
-            # search audit log between $StartTime.StartTimeSlice and $StartTime.EndTimeSlice
+            # Search audit log between $StartTime.StartTimeSlice and $StartTime.EndTimeSlice
             $Logger.LogMessage("Querying Azure to estimate result size", "INFO", $null, $null)
-            $ResultCountEstimate = (Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSlice -EndDate $TimeSlicer.EndTimeSlice -ResultSize 1).ResultCount
+            $ResultCountEstimate = (Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 1).ResultCount
             $Logger.LogMessage("Result Size: $ResultCountEstimate", "INFO", $null, $null)
 
-            if((($ResultCountEstimate -eq 0) -or ($ResultCountEstimate -gt 50000)) -and $AutomaticTimeWindowReduction) {
+            # Only run this block once to determine optimal time interval (likely to be less than 30 min anyway)
+            if((($ResultCountEstimate -eq 0) -or ($ResultCountEstimate -gt 50000)) -and $AutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
 
                 $OptimalTimeSlice = (50000 * $TimeInterval) / $ResultCountEstimate
-                $Logger.LogMessage("Optimal Time Interval: $OptimalTimeSlice", "DEBUG", $null, $null)
+                $OptimalTimeSlice = [math]::Round($OptimalTimeSlice, 2)
+                $Logger.LogMessage("Optimal Hourly Time Interval: $OptimalTimeSlice", "DEBUG", $null, $null)
 
                 if($OptimalTimeSlice -lt 0.5) {
-                    $Logger.LogMessage("Density of logs is too high and Azure does not allow Time Intervals of less than 30min. Setting new interval at 30min", "DEBUG", $null, $null)
+                    $Logger.LogMessage("Density of logs is too high and Azure does not allow Time Intervals of less than 30 min. Setting new interval at 30 min", "DEBUG", $null, $null)
                     $TimeInterval = 0.5
                     $TimeSlicer.Reset()
                     $TimeSlicer.IncrementTimeSlice($TimeInterval)
 
                 }
                 else {
-                    $Logger.LogMessage("Size of results is too big. Reducing Time Interval to $OptimalTimeSlice", "INFO", $null, $null)
+                    $Logger.LogMessage("Size of results is too big. Reducing Hourly Time Interval to $OptimalTimeSlice", "INFO", $null, $null)
                     $TimeInterval = $OptimalTimeSlice
                     $TimeSlicer.Reset()
                     $TimeSlicer.IncrementTimeSlice($TimeInterval)
                 }
 
                 # Go to next cycle, start again with new timeslice
+                $TimeSlicer.IntervalAdjusted = $true
                 continue
 
             }
 
-
-            #[System.Collections.ArrayList]$ResultCumulus = @()
-            $TimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
-            $ExportFileName = "$($Logger.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$TimeNow.csv"
+            # We need the result cumulus to keep track of the batch of 50k logs
+            # These logs will get sort by date and the last date used as the new $StartTimeSlice value
+            [System.Collections.ArrayList]$ResultCumulus = @()
+            $Logger.LogMessage("Proceeding to log extraction", "INFO", $null, $null)
+            $Logger.LogMessage("Current TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+            
+            $ExportFileName = "$($Logger.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$($Logger.strTimeNow).csv"
             $RandomSessionName = "azurehunter-$(Get-Random)"
-            $Results = Search-UnifiedAuditLog -StartDate $StartDate -EndDate $EndDate -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
+            $Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
+            $EndResultIndex = $Results[($Results.Count - 1)].ResultIndex
 
             # Loop through paged results and extract all of them sequentially, before going into the next TimeSlice cycle
-            while((($Results[($Results.Count - 1)].ResultIndex -ne $Results[0].ResultCount)) -or $Results[($Results.Count - 1)].ResultIndex -eq 50000) {
+            while((($EndResultIndex -ne $Results[0].ResultCount)) -xor $EndResultIndex -eq 50000) {
 
-                $Results = Search-UnifiedAuditLog -StartDate $StartDate -EndDate $EndDate -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomName
+                # Debug
+                $Logger.LogMessage("ResultIndex End: $EndResultIndex", "DEBUG", $null, $null)
+                $LastLogJSON = ($Results[($Results.Count - 1)] | ConvertTo-Json -Compress).ToString()
+                $Logger.LogMessage($LastLogJSON, "SPECIAL", $null, $null)
 
                 # Export Results
                 $StartingResultIndex = $Results[0].ResultIndex
                 $EndResultIndex = $Results[($Results.Count - 1)].ResultIndex
                 $Logger.LogMessage("Exporting records from $StartingResultIndex to $EndResultIndex", "INFO", $null, $null)
                 $Results | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append 
-                #$Results | ForEach-Object { $ResultCumulus.add($_) }
+                $Results | ForEach-Object { $ResultCumulus.add($_) | Out-Null }
+
+                # Run for next loop
+                $Logger.LogMessage("Fetching next batch of logs. Session: $RandomSessionName", "DEBUG", $null, $null)
+                $Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
             }
 
-            # Increase time slice for the next loop
+            # Increase time slice for the next loop according to timestamp of latest received event
+            # Azure records are returned in UTC, so we need to provide the local value equivalent for $TimeSlicer.EndTimeSlice
+            # The TimeSlicer class takes care of generating equivalent UTC timestamps
+            # Here, setting $TimeSlicer.EndTimeSlice to the latest timestamp of received records, causes the slicer to consider that as the starting point for the next slice calculation
+            $SortedCumulus = $ResultCumulus | Sort-Object -Property CreationDate
+            $LastCreationDateRecord = $SortedCumulus[($SortedCumulus.Count -1)].CreationDate
+            $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime())", "INFO", $null, $null)
+            $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.ToLocalTime()
             $TimeSlicer.IncrementTimeSlice($TimeInterval)
         }
     }
