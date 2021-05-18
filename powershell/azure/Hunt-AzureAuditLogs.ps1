@@ -12,6 +12,7 @@ class TimeStamp {
 
     # Public Properties
     [float] $Interval
+    [float] $IntervalInMinutes
     [bool] $IntervalAdjusted
     [System.Globalization.CultureInfo] $Culture
     [DateTime] $StartTime
@@ -449,26 +450,70 @@ Function Search-AzureCloudUnifiedLog {
 
         # Flow Control
         $NumberOfAttempts = 1   # How many times a call to the API should be attempted before proceeding to the next block
-        $LogExtractionOk = $false # Wether log extraction succeeded or not
         $ResultCountEstimate = 0 # Start with a value that triggers the time window reduction loop
+        $ResultSizeUpperThreshold = 20000 # Maximum amount of records we want returned within our current time slice
+        $ShouldExportResults = $true # whether results should be exported or not in a given loop
+        $TimeIntervalReductionRate = 0.2 # the percentage by which the time interval is reduced until returned results is within $ResultSizeUpperThreshold
+        $FirstOptimalTimeIntervalCheck = $false # whether we should perform the initial optimal timeslice check when looking for automatic time window reduction
+
+        $Logger.LogMessage("Upper Log ResultSize Threshold: $ResultSizeUpperThreshold", "SPECIAL", $null, $null)
+
 
         while($TimeSlicer.StartTimeSlice -le $TimeSlicer.EndTime) {
+
+            # Setup block variables
+            $ExportFileName = "$($Logger.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$($Logger.strTimeNow).csv"
+            $RandomSessionName = "azurehunter-$(Get-Random)"
+            $NumberOfAttempts = 1
 
             # Search audit log between $TimeSlicer.StartTimeSlice and $TimeSlicer.EndTimeSlice
             # Only run this block once to determine optimal time interval (likely to be less than 30 min anyway)
             # We need to avoid scenarios where the time interval initially setup by the user is less than 30 min
-            if((($ResultCountEstimate -eq 0) -or ($ResultCountEstimate -ge 20000) -or ($InitialTimeInterval -lt 5)) -and $AutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
+            if((($ResultCountEstimate -eq 0) -xor ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and $AutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
 
                 # Run initial query to estimate results and adjust time intervals
                 $Logger.LogMessage("Querying Azure to estimate initial result size", "INFO", $null, $null)
-                $ResultCountEstimate = (Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 1).ResultCount
+                $Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
+                $ResultCountEstimate = $Script:Results[0].ResultCount
                 $Logger.LogMessage("Initial Result Size estimate: $ResultCountEstimate", "INFO", $null, $null)
+                
+                # Check if the ResultEstimate is within expected limits.
+                # If it is, then break and proceed to log extraction process with new timeslice
+                if($ResultCountEstimate -le $ResultSizeUpperThreshold) {
+                    $Logger.LogMessage("Result Size estimate with new time interval value: $ResultCountEstimate", "INFO", $null, $null)
+                    $TimeSlicer.IntervalAdjusted = $true
+                    continue
+                }
 
+                # This OptimalTimeIntervalCheck helps shorten the time it takes to arrive to a proper time window 
+                # within the expected ResultSize window
+                if($FirstOptimalTimeIntervalCheck -eq $false) {
+                    $Logger.LogMessage("Estimating Optimal Hourly Time Interval...", "DEBUG", $null, $null)
+                    $OptimalTimeSlice = ($ResultSizeUpperThreshold * $TimeInterval) / $ResultCountEstimate
+                    $OptimalTimeSlice = [math]::Round($OptimalTimeSlice, 3)
+                    $IntervalInMinutes = $OptimalTimeSlice * 60
+                    $Logger.LogMessage("Estimated Optimal Hourly Time Interval: $OptimalTimeSlice ($IntervalInMinutes minutes). Reducing interval to this value...", "DEBUG", $null, $null)
+
+                    $TimeInterval = $OptimalTimeSlice
+                    $TimeSlicer.Reset()
+                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                    $FirstOptimalTimeIntervalCheck = $true
+                    continue
+                }
+                else {
+                    $AdjustedHourlyTimeInterval = $TimeInterval - ($TimeInterval * $TimeIntervalReductionRate)
+                    $AdjustedHourlyTimeInterval = [math]::Round($AdjustedHourlyTimeInterval, 3)
+                    $IntervalInMinutes = $AdjustedHourlyTimeInterval * 60
+                    $Logger.LogMessage("Size of results is too big. Reducing Hourly Time Interval by $TimeIntervalReductionRate to $AdjustedHourlyTimeInterval hours ($IntervalInMinutes minutes)", "INFO", $null, $null)
+                    $TimeInterval = $AdjustedHourlyTimeInterval
+                    $TimeSlicer.Reset()
+                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                    continue
+                }
                 <#
-                $OptimalTimeSlice = (5000 * $TimeInterval) / $ResultCountEstimate
+                
 
-                $OptimalTimeSlice = [math]::Round($OptimalTimeSlice, 3)
-                $Logger.LogMessage("Optimal Hourly Time Interval: $OptimalTimeSlice", "DEBUG", $null, $null)
+                
 
                 if($OptimalTimeSlice -lt 0.5) {
                     $Logger.LogMessage("Density of logs is too high and Azure does not allow Time Intervals of less than 15 min. Setting new interval at 15 min", "DEBUG", $null, $null)
@@ -483,33 +528,17 @@ Function Search-AzureCloudUnifiedLog {
                     $TimeSlicer.Reset()
                     $TimeSlicer.IncrementTimeSlice($TimeInterval)
                 }
-                #>
-
-                $HalvedHourlyTimeInterval = $TimeInterval / 2
-                $Logger.LogMessage("Size of results is too big. Reducing Hourly Time Interval by half to $HalvedHourlyTimeInterval hours", "INFO", $null, $null)
-                $TimeInterval = $HalvedHourlyTimeInterval
-                $TimeSlicer.Reset()
-                $TimeSlicer.IncrementTimeSlice($TimeInterval)
-
-                # Check if the ResultEstimate is within expected limits.
-                # If it is, go to next cycle, start log extraction process with new timeslice
-                # And skip 
-                if($ResultCountEstimate -le 20000) {
-                    $TimeSlicer.IntervalAdjusted = $true
-                }
-                continue
+                #>                
 
             }
 
-            # We need the result cumulus to keep track of the batch of 50k logs
-            # These logs will get sort by date and the last date used as the new $StartTimeSlice value
-            [System.Collections.ArrayList]$ResultCumulus = @()
-            $Logger.LogMessage("Proceeding to log extraction", "INFO", $null, $null)
-            $Logger.LogMessage("Current TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+            
+            #$Logger.LogMessage("Proceeding to log extraction", "INFO", $null, $null)
+            #$Logger.LogMessage("Current TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
 
-            $ExportFileName = "$($Logger.ScriptPath)\$($env:COMPUTERNAME)-azurehunter-$($Logger.strTimeNow).csv"
-            $RandomSessionName = "azurehunter-$(Get-Random)"
+            
 
+            <#
             while ($NumberOfAttempts -le 3) {
 
                 Write-Host "NUmber of attemepts: $NumberOfAttempts"
@@ -545,56 +574,145 @@ Function Search-AzureCloudUnifiedLog {
                 $NumberOfAttempts = 1
                 continue
             }
+            #>
+
+            # We need the result cumulus to keep track of the batch of 50k logs
+            # These logs will get sort by date and the last date used as the new $StartTimeSlice value
+            [System.Collections.ArrayList]$Script:ResultCumulus = @()
 
             # Loop through paged results and extract all of them sequentially, before going into the next TimeSlice cycle
             # PROBLEM: the problem with this approach is that at some point Azure would start returning result indices 
             # that were not sequential and thus messing up the script. However this is the best way to export the highest
             # amount of logs within a timespan of 30 min (considering less than that is not accepted by Azure API). So the 
-            # solution should be to implement a check and abort log exporting when result index stops being sequential.
-            while((($EndResultIndex -ne $Results[0].ResultCount)) -xor $Results.Count -eq 0) {
+            # solution should be to implement a check and abort log exporting when result index stops being sequential. 
+
+            while(($Script:Results.Count -ne 0) -or ($ShouldRunReturnLargeSetLoop -eq $true) -or ($NumberOfAttempts -le 3)) {
 
                 # Debug
-                
-                $Logger.LogMessage("ResultIndex End: $EndResultIndex", "DEBUG", $null, $null)
-                $LastLogJSON = ($Results[($Results.Count - 1)] | ConvertTo-Json -Compress).ToString()
-                $Logger.LogMessage($LastLogJSON, "LOW", $null, $null)
+                #DEBUG $Logger.LogMessage("ResultIndex End: $EndResultIndex", "DEBUG", $null, $null)
+                #DEBUG $LastLogJSON = ($Results[($Results.Count - 1)] | ConvertTo-Json -Compress).ToString()
+                #DEBUG $Logger.LogMessage($LastLogJSON, "LOW", $null, $null)
 
-                # Export Results
-                $StartingResultIndex = $Results[0].ResultIndex
-                $Logger.LogMessage("Exporting records from $StartingResultIndex to $EndResultIndex", "INFO", $null, $null)
-                $Results | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append 
-                $Results | ForEach-Object { $ResultCumulus.add($_) | Out-Null }
-
-                # Run for next loop
+                # Run for this loop
                 $Logger.LogMessage("Fetching next batch of logs. Session: $RandomSessionName", "DEBUG", $null, $null)
-                $Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
-                $EndResultIndex = $Results[($Results.Count - 1)].ResultIndex
+                $Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
+
+                # Test whether we got any results at all
+                # If we got results, we need to determine wether the ResultSize is too big
+                if($Script:Results.Count -eq 0) {
+                    $Logger.LogMessage("No more logs remaining in session $RandomSessionName", "DEBUG", $null, $null)
+                    $ShouldExportResults = $true
+                    break
+                }
+                else {
+
+                    $ResultCountEstimate = $Script:Results[0].ResultCount
+                    $Logger.LogMessage("Result Size: $ResultCountEstimate | Session: $RandomSessionName", "INFO", $null, $null)
+
+                    # Test whether result size is within threshold limits
+                    # Since a particular TimeInterval does not guarantee it will produce the desired log density for
+                    # all time slices (log volume varies in the enterprise throught the day)
+                    if((($ResultCountEstimate -eq 0) -or ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and $AutomaticTimeWindowReduction) {
+                        $Logger.LogMessage("Result density is higher than the threshold of $ResultSizeUpperThreshold. Adjusting time intervals.", "DEBUG", $null, $null)
+                        # Reset timer flow control flags
+                        $TimeSlicer.IntervalAdjusted = $false
+                        $FirstOptimalTimeIntervalCheck = $false
+                        # Set results export flag
+                        $ShouldExportResults = $false
+                        $ShouldRunTimeWindowAdjustment = $true
+                        break
+                    }
+                    # Else if results within Threshold limits
+                    else {
+                        $ShouldExportResults = $true
+                    }
+
+                    # Tracking session and results for current and previous sessions
+                    if($CurrentSession){ $FormerSession = $CurrentSession } else {$FormerSession = $RandomSessionName}
+                    $CurrentSession = $RandomSessionName
+                    if($HighestEndResultIndex){ $FormerHighestEndResultIndex = $HighestEndResultIndex } else {$FormerHighestEndResultIndex = $EndResultIndex}
+                    $StartResultIndex = $Script:Results[0].ResultIndex
+                    $HighestEndResultIndex = $Script:Results[($Script:Results.Count - 1)].ResultIndex
+                    
+
+                    # Check for Azure API and/or Powershell crazy behaviour when it goes back and re-exports duplicated results
+                    # Check (1): Is the current end record index lower than the previous end record index? --> YES --> then crazy shit
+                    # Check (2): Is the current end record index lower than the current start record index? --> YES --> then crazy shit
+                    # Only run this check within the same sessions (since comparing these parameters between different sessions will return erroneous checks)
+                    if($FormerSession -eq $CurrentSession) {
+                        if (($HighestEndResultIndex -lt $FormerHighestEndResultIndex) -or ($StartResultIndex -gt $HighestEndResultIndex)) {
+
+                            $Logger.LogMessage("Azure API or Search-UnifiedAuditLog behaving weirdly and going back in time... Need to abort this cycle and proceed to next timeslice | CurrentSession = $CurrentSession | FormerSession = $FormerSession | FormerHighestEndResultIndex = $FormerHighestEndResultIndex | CurrentHighestEndResultIndex = $HighestEndResultIndex | StartResultIndex = $StartResultIndex |  Result Count = $($Script:Results.Count)", "ERROR", $null, $null)
+                            
+                            if($NumberOfAttempts -lt 3) {
+                                $RandomSessionName = "azurehunter-$(Get-Random)"
+                                $Logger.LogMessage("Failed to query Azure API: Attempt $NumberOfAttempts of 3. Trying again in new session: $RandomSessionName", "ERROR", $null, $null)
+                                $NumberOfAttempts++
+                                continue
+                            }
+                            else {
+                                $Logger.LogMessage("Failed to query Azure API: Attempt $NumberOfAttempts of 3. Exporting collected partial results so far and increasing timeslice", "SPECIAL", $null, $null)
+                                $ShouldExportResults = $true
+                                break
+                            }
+                        }
+                    }
+                }
+
+                # Collate Results
+                $StartingResultIndex = $Script:Results[0].ResultIndex
+                $EndResultIndex = $Script:Results[($Script:Results.Count - 1)].ResultIndex
+                $Logger.LogMessage("Adding records $StartingResultIndex to $EndResultIndex", "INFO", $null, $null)
+                $Script:Results | ForEach-Object { $Script:ResultCumulus.add($_) | Out-Null }
+
             }
 
-            $Logger.LogMessage("Exporting records from $StartRecordIndex to $($TotalRecords + $EndResultIndex)", "DEBUG", $null, $null)
-            $TotalRecords = $TotalRecords + $EndResultIndex
-            $Logger.LogMessage("Total exported records so far: $TotalRecords", "INFO", $null, $null)
-            $StartRecordIndex = $TotalRecords
+            # If available results are bigger than the Threshold, then don't export logs
+            if($ShouldExportResults -eq $false) {
 
-            $SortedResults = $Results | Sort-Object -Property CreationDate
-            $SortedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append 
-            $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
+                if ($ShouldRunTimeWindowAdjustment) {
+                    # We need to adjust time window and start again
+                    continue
+                }
+            }
+            else {
 
-            $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "DEBUG", $null, $null)
-            $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.ToLocalTime()
-            $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                # Exporting logs
+                # Sorting and Deduplicating Results
+                # DEDUPING
+                $Logger.LogMessage("Sorting and Deduplicating Results", "DEBUG", $null, $null)
+                $ResultCountBeforeDedup = $Script:ResultCumulus.Count
+                $DedupedResults = $Script:ResultCumulus | Sort-Object -Property Identity -Unique
+                $ResultCountAfterDedup = $DedupedResults.Count
+                $ResultCountDuplicates = $ResultCountBeforeDedup - $ResultCountAfterDedup
+                $Logger.LogMessage("Removed $ResultCountDuplicates Duplicate Records", "SPECIAL", $null, $null)
 
-            <#
-            # Increase time slice for the next loop according to timestamp of latest received event
-            # Azure records are returned in UTC, so we need to provide the local value equivalent for $TimeSlicer.EndTimeSlice
-            # The TimeSlicer class takes care of generating equivalent UTC timestamps
-            # Here, setting $TimeSlicer.EndTimeSlice to the latest timestamp of received records, causes the slicer to consider that as the starting point for the next slice calculation
-            $SortedCumulus = $ResultCumulus | Sort-Object -Property CreationDate
-            $LastCreationDateRecord = $SortedCumulus[($SortedCumulus.Count -1)].CreationDate
-            $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime())", "INFO", $null, $null)
-            $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.ToLocalTime()
-            $TimeSlicer.IncrementTimeSlice($TimeInterval)
-            #>
+                # SORTING by TimeStamp
+                $SortedResults = $DedupedResults | Sort-Object -Property CreationDate
+
+                # Count total records so far
+                $TotalRecords = $TotalRecords + $SortedResults.Count
+                $Logger.LogMessage("Exporting records to $ExportFileName", "DEBUG", $null, $null)
+                $SortedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
+                $Logger.LogMessage("Total Records exported so far: $TotalRecords ", "SPECIAL", $null, $null)
+
+                $FirstCreationDateRecord = $SortedResults[0].CreationDate
+                $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
+                $Logger.LogMessage("SortedResults Size = $($SortedResults.Count)", "SPECIAL", $null, $null)
+                $Logger.LogMessage("TimeStamp of first received record in local time: $($FirstCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
+                $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
+
+                # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
+                # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
+                $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.AddSeconds(1).ToLocalTime()
+                $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+
+                # Set flag to run ReturnLargeSet loop next time
+                $ShouldRunReturnLargeSetLoop = $true
+                $SortedResults = $null
+                [System.Collections.ArrayList]$Script:ResultCumulus = @()
+            }
         }
     }
 }
