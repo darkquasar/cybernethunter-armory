@@ -455,8 +455,11 @@ Function Search-AzureCloudUnifiedLog {
         $ShouldExportResults = $true # whether results should be exported or not in a given loop
         $TimeIntervalReductionRate = 0.2 # the percentage by which the time interval is reduced until returned results is within $ResultSizeUpperThreshold
         $FirstOptimalTimeIntervalCheck = $false # whether we should perform the initial optimal timeslice check when looking for automatic time window reduction
+        $AggregatedResultsFlushSize = 20000 # the amount of logs that need to be accumulated before deduping and exporting, setting it to 0 (zero) gets rid of this requirement and exports all batches
+        [System.Collections.ArrayList]$Script:AggregatedResults = @()
 
         $Logger.LogMessage("Upper Log ResultSize Threshold: $ResultSizeUpperThreshold", "SPECIAL", $null, $null)
+        $Logger.LogMessage("Aggregated Results Max Size: $AggregatedResultsFlushSize", "SPECIAL", $null, $null)
 
 
         while($TimeSlicer.StartTimeSlice -le $TimeSlicer.EndTime) {
@@ -509,72 +512,9 @@ Function Search-AzureCloudUnifiedLog {
                     $TimeSlicer.Reset()
                     $TimeSlicer.IncrementTimeSlice($TimeInterval)
                     continue
-                }
-                <#
-                
-
-                
-
-                if($OptimalTimeSlice -lt 0.5) {
-                    $Logger.LogMessage("Density of logs is too high and Azure does not allow Time Intervals of less than 15 min. Setting new interval at 15 min", "DEBUG", $null, $null)
-                    $TimeInterval = 0.15
-                    $TimeSlicer.Reset()
-                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
-
-                }
-                else {
-                    $Logger.LogMessage("Size of results is too big. Reducing Hourly Time Interval to $OptimalTimeSlice", "INFO", $null, $null)
-                    $TimeInterval = $OptimalTimeSlice
-                    $TimeSlicer.Reset()
-                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
-                }
-                #>                
+                } 
 
             }
-
-            
-            #$Logger.LogMessage("Proceeding to log extraction", "INFO", $null, $null)
-            #$Logger.LogMessage("Current TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
-
-            
-
-            <#
-            while ($NumberOfAttempts -le 3) {
-
-                Write-Host "NUmber of attemepts: $NumberOfAttempts"
-
-                try {
-                    $Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
-                    $ResultCountEstimate = $Results[0].ResultCount
-                    $EndResultIndex = $Results[($Results.Count - 1)].ResultIndex
-                    $Logger.LogMessage("Result Size: $ResultCountEstimate", "INFO", $null, $null)
-
-                    # Reset NumberOfAttempts if it succeded and this loop is running after a fail
-                    if (($NumberOfAttempts -gt 1) -and ($Results.Count -ge 1)) {
-                        $NumberOfAttempts = 1
-                    }
-
-                    # Log extraction most likely succeeded
-                    break
-                }
-                catch {
-                    $Logger.LogMessage("Failed to query Azure API: Attempt $NumberOfAttempts of 3", "ERROR", $null, $_)
-                    $NumberOfAttempts++
-                    continue
-                }
-
-            }
-
-            # If we are continuing regular code execution after 3 failed attempts
-            # need to increment timeslice for next run and reset $NumberOfAttempts counter
-            if ($NumberOfAttempts -eq 3) {
-                $Logger.LogMessage("Too many failed API call attempts. Incrementing time slice and continuing log extraction", "ERROR", $null, $null)
-                $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.ToLocalTime()
-                $TimeSlicer.IncrementTimeSlice($TimeInterval)
-                $NumberOfAttempts = 1
-                continue
-            }
-            #>
 
             # We need the result cumulus to keep track of the batch of 50k logs
             # These logs will get sort by date and the last date used as the new $StartTimeSlice value
@@ -677,41 +617,91 @@ Function Search-AzureCloudUnifiedLog {
             }
             else {
 
-                # Exporting logs
-                # Sorting and Deduplicating Results
-                # DEDUPING
-                $Logger.LogMessage("Sorting and Deduplicating Results", "DEBUG", $null, $null)
-                $ResultCountBeforeDedup = $Script:ResultCumulus.Count
-                $DedupedResults = $Script:ResultCumulus | Sort-Object -Property Identity -Unique
-                $ResultCountAfterDedup = $DedupedResults.Count
-                $ResultCountDuplicates = $ResultCountBeforeDedup - $ResultCountAfterDedup
-                $Logger.LogMessage("Removed $ResultCountDuplicates Duplicate Records", "SPECIAL", $null, $null)
+                # Exporting logs. Run additional check for Results.Count
+                try {
+                    if($Script:ResultCumulus.Count -ne 0) {
+                        # Sorting and Deduplicating Results
+                        # DEDUPING
+                        $Logger.LogMessage("Sorting and Deduplicating current batch Results", "DEBUG", $null, $null)
+                        $ResultCountBeforeDedup = $Script:ResultCumulus.Count
+                        $DedupedResults = $Script:ResultCumulus | Sort-Object -Property Identity -Unique
+                        $ResultCountAfterDedup = $DedupedResults.Count
+                        $ResultCountDuplicates = $ResultCountBeforeDedup - $ResultCountAfterDedup
+                        $Logger.LogMessage("Removed $ResultCountDuplicates Duplicate Records from current batch", "SPECIAL", $null, $null)
 
-                # SORTING by TimeStamp
-                $SortedResults = $DedupedResults | Sort-Object -Property CreationDate
+                        # SORTING by TimeStamp
+                        $SortedResults = $DedupedResults | Sort-Object -Property CreationDate
+                        $Logger.LogMessage("Current batch Result Size = $($SortedResults.Count)", "SPECIAL", $null, $null)
+                        
+                        if($AggregatedResultsFlushSize -eq 0){
+                            $Logger.LogMessage("No Aggregated Results parameter configured. Exporting current batch of records to $ExportFileName", "DEBUG", $null, $null)
+                            $SortedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
+                            
+                            # Count total records so far
+                            $TotalRecords = $TotalRecords + $SortedResults.Count
+                            $FirstCreationDateRecord = $SortedResults[0].CreationDate
+                            $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
+                            # Report total records
+                            $Logger.LogMessage("Total Records exported so far: $TotalRecords ", "SPECIAL", $null, $null)
+                        }
+                        elseif($Script:AggregatedResults.Count -ge $AggregatedResultsFlushSize) {
 
-                # Count total records so far
-                $TotalRecords = $TotalRecords + $SortedResults.Count
-                $Logger.LogMessage("Exporting records to $ExportFileName", "DEBUG", $null, $null)
-                $SortedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
-                $Logger.LogMessage("Total Records exported so far: $TotalRecords ", "SPECIAL", $null, $null)
+                            # Need to add latest batch of results before exporting
+                            $Logger.LogMessage("AGGREGATED RESULTS | Adding current batch results to Aggregated Results", "SPECIAL", $null, $null)
+                            $SortedResults | ForEach-Object { $Script:AggregatedResults.add($_) | Out-Null }
 
-                $FirstCreationDateRecord = $SortedResults[0].CreationDate
-                $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
-                $Logger.LogMessage("SortedResults Size = $($SortedResults.Count)", "SPECIAL", $null, $null)
-                $Logger.LogMessage("TimeStamp of first received record in local time: $($FirstCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
-                $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
+                            $AggResultCountBeforeDedup = $Script:AggregatedResults.Count
+                            $Script:AggregatedResults = $Script:AggregatedResults | Sort-Object -Property Identity -Unique
+                            $AggResultCountAfterDedup = $Script:AggregatedResults.Count
+                            $AggResultCountDuplicates = $AggResultCountBeforeDedup - $AggResultCountAfterDedup
+                            $Logger.LogMessage("AGGREGATED RESULTS | Removed $AggResultCountDuplicates Duplicate Records from Aggregated Results", "SPECIAL", $null, $null)
+                            $Logger.LogMessage("AGGREGATED RESULTS | Exporting Aggregated Results to $ExportFileName", "SPECIAL", $null, $null)
+                            $Script:AggregatedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
 
-                # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
-                # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
-                $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.AddSeconds(1).ToLocalTime()
-                $TimeSlicer.IncrementTimeSlice($TimeInterval)
-                $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+                            # Count records so far
+                            $TotalRecords = $TotalRecords + $Script:AggregatedResults.Count
+                            $FirstCreationDateRecord = $SortedResults[0].CreationDate
+                            $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
+                            # Report total records
+                            $Logger.LogMessage("Total Records exported so far: $TotalRecords ", "SPECIAL", $null, $null)
 
-                # Set flag to run ReturnLargeSet loop next time
-                $ShouldRunReturnLargeSetLoop = $true
-                $SortedResults = $null
-                [System.Collections.ArrayList]$Script:ResultCumulus = @()
+                            # Reset $Script:AggregatedResults
+                            [System.Collections.ArrayList]$Script:AggregatedResults = @()
+                        }
+                        else {
+                            $Logger.LogMessage("AGGREGATED RESULTS | Adding current batch results to Aggregated Results", "SPECIAL", $null, $null)
+                            $SortedResults | ForEach-Object { $Script:AggregatedResults.add($_) | Out-Null }
+
+                            # Count records so far
+                            $TotalRecords = $TotalRecords + $Script:AggregatedResults.Count
+                            $FirstCreationDateRecord = $SortedResults[0].CreationDate
+                            $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
+                            # Report total records
+                            $Logger.LogMessage("AGGREGATED RESULTS | Total Records aggregated so far: $TotalRecords ", "SPECIAL", $null, $null)
+                        }
+
+                        
+                        $Logger.LogMessage("TimeStamp of first received record in local time: $($FirstCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
+                        $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
+
+                        # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
+                        # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
+                        $TimeSlicer.EndTimeSlice = $LastCreationDateRecord.AddSeconds(1).ToLocalTime()
+                        $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                        $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+
+                        # Set flag to run ReturnLargeSet loop next time
+                        $ShouldRunReturnLargeSetLoop = $true
+                        $SortedResults = $null
+                        [System.Collections.ArrayList]$Script:ResultCumulus = @()
+                    }
+                    else {
+                        continue # try again
+                    }
+                }
+                catch {
+                    $Logger.LogMessage("GENERIC ERROR", "ERROR", $null, $_)
+                }
             }
         }
     }
