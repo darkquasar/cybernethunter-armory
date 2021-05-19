@@ -72,6 +72,72 @@ class TimeStamp {
     }
 }
 
+class AzureSearcher {
+
+    # Public Properties
+    [String[]] $Operations
+    [AuditLogRecordType] $RecordType
+    [String[]] $UserIds
+    [String[]] $FreeText
+    [DateTime] $StartTimeUTC
+    [DateTime] $EndTimeUTC
+    [String] $SessionId
+    [TimeStamp] $TimeSlicer
+
+
+    # Default, Overloaded Constructor
+    AzureSearcher([TimeStamp] $TimeSlicer) {
+        $this.TimeSlicer = $TimeSlicer
+        $this.StartTimeUTC = $TimeSlicer.StartTimeSliceUTC
+        $this.EndTimeUTC = $TimeSlicer.EndTimeSliceUTC
+    }
+
+    [Array] SearchAzureAuditLog([String] $SessionId) {
+
+        # Update Variables
+        $this.StartTimeUTC = $this.TimeSlicer.StartTimeSliceUTC
+        $this.EndTimeUTC = $this.TimeSlicer.EndTimeSliceUTC
+        $this.SessionId = $SessionId
+
+        if($this.Operations -and -not $this.RecordType) {
+            throw "You must specify a RecordType if selecting and Operation"
+        }
+        elseif($this.RecordType) {
+            
+            if($this.Operations) {
+                #  RecordType & Operations parameters provided
+                $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType.ToString() -Operations $this.Operations
+                return $Results
+
+            }
+            # Only RecordType parameter, no Operations
+            else {
+                $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType.ToString()
+                return $Results
+            }
+            
+        }
+        elseif($this.UserIds) {
+            # Fetch all data for a given User
+            $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -UserIds $this.UserIds
+            return $Results
+        }
+        elseif($this.FreeText){
+            # Fetch all data matching a particular string
+            $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -FreeText $this.FreeText
+            return $Results
+        }
+        else {
+            # Fetch all data for everything
+            $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId
+            return $Results
+        }
+    }
+
+
+}
+
+
 class Logger {
 
     <#
@@ -180,11 +246,11 @@ class Logger {
             }
             "Low" {
                 $this.MessageColor = "Green"
-                $this.BackgroundColor = "DarkCyan"
+                $this.BackgroundColor = "Black"
             }
             "Special" {
                 $this.MessageColor = "White"
-                $this.BackgroundColor = "Red"
+                $this.BackgroundColor = "DarkRed"
             }
             "RemoteLog" {
                 $this.MessageColor = "DarkGreen"
@@ -192,7 +258,7 @@ class Logger {
             }
             "Debug" {
                 $this.MessageColor = "Green"
-                $this.BackgroundColor = "Black"
+                $this.BackgroundColor = "DarkCyan"
             }
 
         }
@@ -204,7 +270,8 @@ class Logger {
     }
 }
 
-enum AzureRecordType {
+# Ref: https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype
+enum AuditLogRecordType {
     AeD
     AipDiscover
     AipFileDeleted
@@ -402,34 +469,61 @@ Function Search-AzureCloudUnifiedLog {
         [ValidateNotNullOrEmpty()]
         [float]$TimeInterval=12,
 
-        [Parameter(
-            Mandatory=$False,
-            ValueFromPipeline=$False,
-            ValueFromPipelineByPropertyName=$False,
-            Position=3,
-            HelpMessage='The users you would like to investigate. If this parameter is not provided it will default to all users'
-        )]
-        [string]$UserIDs,
-
         [Parameter( 
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
             Position=4,
-            HelpMessage='The amount of records you would like returned from the search. Defaults to 5000. If value is 0 it means ALL records will be returned'
+            HelpMessage='The ammount of logs that need to be accumulated before deduping and exporting, setting it to 0 (zero) gets rid of this requirement and exports all batches individually. It is recommended to set this value to 50000 for long searches. The higher the value, the more RAM it will consume but the fewer duplicates you will find in your final results.'
         )]
         [ValidateNotNullOrEmpty()]
-        [int]$ResultSize,
+        [int]$AggregatedResultsFlushSize=0,
+
+        [Parameter(
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=5,
+            HelpMessage='The record type that you would like to return. For a list of available ones, check API documentation: https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype'
+        )]
+        [string]$AuditLogRecordType,
+
+        [Parameter(
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=6,
+            HelpMessage='Based on the record type, there are different kinds of operations associated with them. Specify them here separated by commas, each value enclosed within quotation marks'
+        )]
+        [string[]]$AuditLogOperations,
+
+        [Parameter(
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=7,
+            HelpMessage='The users you would like to investigate. If this parameter is not provided it will default to all users. Specify them here separated by commas, each value enclosed within quotation marks'
+        )]
+        [string]$UserIDs,
+
+        [Parameter(
+            Mandatory=$False,
+            ValueFromPipeline=$False,
+            ValueFromPipelineByPropertyName=$False,
+            Position=8,
+            HelpMessage='You can search the log using FreeText strings'
+        )]
+        [string]$FreeText,
 
         [Parameter( 
             Mandatory=$False,
             ValueFromPipeline=$False,
             ValueFromPipelineByPropertyName=$False,
-            Position=5,
-            HelpMessage='This parameter will adjust the TimeInterval windows between your Start and End Dates so as to capture as many records as possible. If the size of returned results for the current interval is 5000, then it will decrease the window by half.'
+            Position=9,
+            HelpMessage='This parameter will skip automatic adjustment of the TimeInterval windows between your Start and End Dates.'
         )]
         [ValidateNotNullOrEmpty()]
-        [switch]$AutomaticTimeWindowReduction
+        [switch]$SkipAutomaticTimeWindowReduction
     )
 
     PROCESS {
@@ -437,28 +531,33 @@ Function Search-AzureCloudUnifiedLog {
         # Grab Start and End Timestamps
         $TimeSlicer = [TimeStamp]::New($StartDate, $EndDate)
         $TimeSlicer.IncrementTimeSlice($TimeInterval)
-        $InitialTimeInterval = ($TimeSlicer.EndDate - $TimeSlicer.StartDate).TotalMinutes
 
         # Initialize Logger
         $Logger = [Logger]::New()
         $Logger.LogMessage("Logs will be written to: $($Logger.ScriptPath)", "DEBUG", $null, $null)
 
+        # Initialize Azure Searcher
+        $AzureSearcher = [AzureSearcher]::new($TimeSlicer)
+        $AzureSearcher.RecordType = [AuditLogRecordType]::$AuditLogRecordType
+        $AzureSearcher.Operations = $AuditLogOperations
+        $AzureSearcher.UserIds = $UserIDs
+        $AzureSearcher.FreeText = $FreeText
+        $Logger.LogMessage("AzureSearcher Settings | RecordType: $($AzureSearcher.RecordType) | Operations: $($AzureSearcher.Operations) | UserIDs: $($AzureSearcher.UserIds) | FreeText: $($AzureSearcher.FreeText)", "SPECIAL", $null, $null)
+
         # Records Counter
-        $StartRecordIndex = 1
-        $EndRecordIndex = 0
         $TotalRecords = 0
 
         # Flow Control
+        $TimeWindowAdjustmentNumberOfAttempts = 1  # How many times the TimeWindowAdjustmentNumberOfAttempts should be attempted before proceeding to the next block
         $NumberOfAttempts = 1   # How many times a call to the API should be attempted before proceeding to the next block
         $ResultCountEstimate = 0 # Start with a value that triggers the time window reduction loop
         $ResultSizeUpperThreshold = 20000 # Maximum amount of records we want returned within our current time slice
-        $ShouldExportResults = $true # whether results should be exported or not in a given loop
+        $ShouldExportResults = $true # whether results should be exported or not in a given loop, this flag helps determine whether export routines should run when there are errors or no records provided
         $TimeIntervalReductionRate = 0.2 # the percentage by which the time interval is reduced until returned results is within $ResultSizeUpperThreshold
         $FirstOptimalTimeIntervalCheck = $false # whether we should perform the initial optimal timeslice check when looking for automatic time window reduction
-        $AggregatedResultsFlushSize = 20000 # the amount of logs that need to be accumulated before deduping and exporting, setting it to 0 (zero) gets rid of this requirement and exports all batches
         [System.Collections.ArrayList]$Script:AggregatedResults = @()
 
-        $Logger.LogMessage("Upper Log ResultSize Threshold: $ResultSizeUpperThreshold", "SPECIAL", $null, $null)
+        $Logger.LogMessage("Upper Log ResultSize Threshold for each Batch: $ResultSizeUpperThreshold", "SPECIAL", $null, $null)
         $Logger.LogMessage("Aggregated Results Max Size: $AggregatedResultsFlushSize", "SPECIAL", $null, $null)
 
 
@@ -472,14 +571,28 @@ Function Search-AzureCloudUnifiedLog {
             # Search audit log between $TimeSlicer.StartTimeSlice and $TimeSlicer.EndTimeSlice
             # Only run this block once to determine optimal time interval (likely to be less than 30 min anyway)
             # We need to avoid scenarios where the time interval initially setup by the user is less than 30 min
-            if((($ResultCountEstimate -eq 0) -xor ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and $AutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
+            if((($ResultCountEstimate -eq 0) -xor ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and -not $SkipAutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
 
                 # Run initial query to estimate results and adjust time intervals
                 $Logger.LogMessage("Querying Azure to estimate initial result size", "INFO", $null, $null)
-                $Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
-                $ResultCountEstimate = $Script:Results[0].ResultCount
-                $Logger.LogMessage("Initial Result Size estimate: $ResultCountEstimate", "INFO", $null, $null)
-                
+                $Script:Results = $AzureSearcher.SearchAzureAuditLog($RandomSessionName)
+
+                try {
+                    $ResultCountEstimate = $Script:Results[0].ResultCount
+                    $Logger.LogMessage("Initial Result Size estimate: $ResultCountEstimate", "INFO", $null, $null)
+                }
+                catch {
+                    if($TimeWindowAdjustmentNumberOfAttempts -lt 3) {
+                        $Logger.LogMessage("Failed to query Azure API during initial ResultCountEstimate: Attempt $TimeWindowAdjustmentNumberOfAttempts of 3. Trying again", "ERROR", $null, $_)
+                        $TimeWindowAdjustmentNumberOfAttempts++
+                        continue
+                    }
+                    else {
+                        $Logger.LogMessage("Failed to query Azure API during initial ResultCountEstimate: Attempt $TimeWindowAdjustmentNumberOfAttempts of 3. Exiting...", "ERROR", $null, $null)
+                        break
+                    }
+                }
+
                 # Check if the ResultEstimate is within expected limits.
                 # If it is, then break and proceed to log extraction process with new timeslice
                 if($ResultCountEstimate -le $ResultSizeUpperThreshold) {
@@ -534,20 +647,21 @@ Function Search-AzureCloudUnifiedLog {
                 #DEBUG $Logger.LogMessage($LastLogJSON, "LOW", $null, $null)
 
                 # Run for this loop
-                $Logger.LogMessage("Fetching next batch of logs. Session: $RandomSessionName", "DEBUG", $null, $null)
-                $Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
+                $Logger.LogMessage("Fetching next batch of logs. Session: $RandomSessionName", "LOW", $null, $null)
+                $Script:Results = $AzureSearcher.SearchAzureAuditLog($RandomSessionName)
+                #$Script:Results = Search-UnifiedAuditLog -StartDate $TimeSlicer.StartTimeSliceUTC -EndDate $TimeSlicer.EndTimeSliceUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $RandomSessionName
 
                 # Test whether we got any results at all
                 # If we got results, we need to determine wether the ResultSize is too big
                 if($Script:Results.Count -eq 0) {
-                    $Logger.LogMessage("No more logs remaining in session $RandomSessionName", "DEBUG", $null, $null)
+                    $Logger.LogMessage("No more logs remaining in session $RandomSessionName", "LOW", $null, $null)
                     $ShouldExportResults = $true
                     break
                 }
                 else {
 
                     $ResultCountEstimate = $Script:Results[0].ResultCount
-                    $Logger.LogMessage("Result Size: $ResultCountEstimate | Session: $RandomSessionName", "INFO", $null, $null)
+                    $Logger.LogMessage("Batch Result Size: $ResultCountEstimate | Session: $RandomSessionName", "INFO", $null, $null)
 
                     # Test whether result size is within threshold limits
                     # Since a particular TimeInterval does not guarantee it will produce the desired log density for
@@ -622,7 +736,7 @@ Function Search-AzureCloudUnifiedLog {
                     if($Script:ResultCumulus.Count -ne 0) {
                         # Sorting and Deduplicating Results
                         # DEDUPING
-                        $Logger.LogMessage("Sorting and Deduplicating current batch Results", "DEBUG", $null, $null)
+                        $Logger.LogMessage("Sorting and Deduplicating current batch Results", "LOW", $null, $null)
                         $ResultCountBeforeDedup = $Script:ResultCumulus.Count
                         $DedupedResults = $Script:ResultCumulus | Sort-Object -Property Identity -Unique
                         $ResultCountAfterDedup = $DedupedResults.Count
