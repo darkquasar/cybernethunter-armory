@@ -76,14 +76,33 @@ class AzureSearcher {
 
     # Public Properties
     [String[]] $Operations
-    [AuditLogRecordType] $RecordType
+    [String] $RecordType
     [String[]] $UserIds
-    [String[]] $FreeText
+    [String] $FreeText
     [DateTime] $StartTimeUTC
     [DateTime] $EndTimeUTC
     [String] $SessionId
     [TimeStamp] $TimeSlicer
 
+    [AzureSearcher] SetOperations([String[]] $Operations) {
+        $this.Operations = $Operations
+        return $this
+    }
+
+    [AzureSearcher] SetRecordType([AuditLogRecordType] $RecordType) {
+        $this.RecordType = $RecordType.ToString()
+        return $this
+    }
+
+    [AzureSearcher] SetUserIds([String[]] $UserIds) {
+        $this.UserIds = $UserIds
+        return $this
+    }
+
+    [AzureSearcher] SetFreeText([String] $FreeText) {
+        $this.FreeText = $FreeText
+        return $this
+    }
 
     # Default, Overloaded Constructor
     AzureSearcher([TimeStamp] $TimeSlicer) {
@@ -99,42 +118,64 @@ class AzureSearcher {
         $this.EndTimeUTC = $this.TimeSlicer.EndTimeSliceUTC
         $this.SessionId = $SessionId
 
-        if($this.Operations -and -not $this.RecordType) {
-            throw "You must specify a RecordType if selecting and Operation"
-        }
-        elseif($this.RecordType) {
-            
-            if($this.Operations) {
-                #  RecordType & Operations parameters provided
-                $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType.ToString() -Operations $this.Operations
-                return $Results
+        try {
+            if($this.Operations -and -not $this.RecordType) {
+                throw "You must specify a RecordType if selecting and Operation"
+            }
+            elseif($this.RecordType -and ($this.RecordType -ne "All")) {
+                
+                if($this.Operations) {
 
+                    if($this.FreeText){
+                        # RecordType, Operations & FreeText parameters provided
+                        $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType -Operations $this.Operations -FreeText $this.FreeText -ErrorAction Stop
+                        return $Results
+                    }
+                    else {
+                        #  Only RecordType & Operations parameters provided
+                        $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType -Operations $this.Operations -ErrorAction Stop
+                        return $Results
+                    }
+
+                }
+                
+                else {
+                    if($this.FreeText){
+                        # Only RecordType & FreeText parameters provided
+                        $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType -FreeText $this.FreeText -ErrorAction Stop
+                        return $Results
+                    }
+                    else {
+                        # Only RecordType parameter provided, no Operations or FreeText
+                        $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType -ErrorAction Stop
+                        return $Results
+                    }
+                }
+                
             }
-            # Only RecordType parameter, no Operations
+            elseif($this.UserIds -or $this.FreeText) {
+
+                if($this.FreeText){
+                    # Fetch all data matching a particular string and a given User
+                    $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -UserIds $this.UserIds -FreeText $this.FreeText -ErrorAction Stop
+                    return $Results
+                }
+                else {
+                    # Fetch all data for a given User only
+                    $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -UserIds $this.UserIds -ErrorAction Stop
+                    return $Results
+                }
+            }
             else {
-                $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -RecordType $this.RecordType.ToString()
+                # Fetch all data for everything
+                $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -ErrorAction Stop
                 return $Results
             }
-            
         }
-        elseif($this.UserIds) {
-            # Fetch all data for a given User
-            $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -UserIds $this.UserIds
-            return $Results
-        }
-        elseif($this.FreeText){
-            # Fetch all data matching a particular string
-            $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId -FreeText $this.FreeText
-            return $Results
-        }
-        else {
-            # Fetch all data for everything
-            $Results = Search-UnifiedAuditLog -StartDate $this.StartTimeUTC -EndDate $this.EndTimeUTC -ResultSize 5000 -SessionCommand ReturnLargeSet -SessionId $this.SessionId
-            return $Results
+        catch {
+            throw $_
         }
     }
-
-
 }
 
 
@@ -237,7 +278,7 @@ class Logger {
         Switch ($this.MessageType) {
 
             "Error" {
-                $this.MessageColor = "Gray"
+                $this.MessageColor = "Red"
                 $this.BackgroundColor = "Black"
             }
             "Info" {
@@ -272,6 +313,8 @@ class Logger {
 
 # Ref: https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype
 enum AuditLogRecordType {
+    All
+    Mierda
     AeD
     AipDiscover
     AipFileDeleted
@@ -486,7 +529,7 @@ Function Search-AzureCloudUnifiedLog {
             Position=5,
             HelpMessage='The record type that you would like to return. For a list of available ones, check API documentation: https://docs.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#auditlogrecordtype'
         )]
-        [string]$AuditLogRecordType,
+        [string]$AuditLogRecordType="All",
 
         [Parameter(
             Mandatory=$False,
@@ -538,10 +581,7 @@ Function Search-AzureCloudUnifiedLog {
 
         # Initialize Azure Searcher
         $AzureSearcher = [AzureSearcher]::new($TimeSlicer)
-        $AzureSearcher.RecordType = [AuditLogRecordType]::$AuditLogRecordType
-        $AzureSearcher.Operations = $AuditLogOperations
-        $AzureSearcher.UserIds = $UserIDs
-        $AzureSearcher.FreeText = $FreeText
+        $AzureSearcher.SetRecordType([AuditLogRecordType]::$AuditLogRecordType).SetOperations($AuditLogOperations).SetUserIds($UserIds).SetFreeText($FreeText) | Out-Null
         $Logger.LogMessage("AzureSearcher Settings | RecordType: $($AzureSearcher.RecordType) | Operations: $($AzureSearcher.Operations) | UserIDs: $($AzureSearcher.UserIds) | FreeText: $($AzureSearcher.FreeText)", "SPECIAL", $null, $null)
 
         # Records Counter
@@ -574,12 +614,15 @@ Function Search-AzureCloudUnifiedLog {
             if((($ResultCountEstimate -eq 0) -xor ($ResultCountEstimate -gt $ResultSizeUpperThreshold)) -and -not $SkipAutomaticTimeWindowReduction -and -not ($TimeSlicer.IntervalAdjusted -eq $true)) {
 
                 # Run initial query to estimate results and adjust time intervals
-                $Logger.LogMessage("Querying Azure to estimate initial result size", "INFO", $null, $null)
-                $Script:Results = $AzureSearcher.SearchAzureAuditLog($RandomSessionName)
-
                 try {
-                    $ResultCountEstimate = $Script:Results[0].ResultCount
-                    $Logger.LogMessage("Initial Result Size estimate: $ResultCountEstimate", "INFO", $null, $null)
+                    $Logger.LogMessage("Initial TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+                    $Logger.LogMessage("Querying Azure to estimate initial result size", "INFO", $null, $null)
+
+                    $Script:Results = $AzureSearcher.SearchAzureAuditLog($RandomSessionName)
+                }
+                catch [System.Management.Automation.RemoteException] {
+                    $Logger.LogMessage("Failed to query Azure API during initial ResultCountEstimate. Please check passed parameters and Azure API error", "ERROR", $null, $_)
+                    break
                 }
                 catch {
                     if($TimeWindowAdjustmentNumberOfAttempts -lt 3) {
@@ -592,6 +635,19 @@ Function Search-AzureCloudUnifiedLog {
                         break
                     }
                 }
+                
+                # Now check whether we got any results back, if not, then there are no results for this particular 
+                # timewindow. We need to increase timewindow and start again.
+                try {
+                    $ResultCountEstimate = $Script:Results[0].ResultCount
+                    $Logger.LogMessage("Initial Result Size estimate: $ResultCountEstimate", "INFO", $null, $null)
+                }
+                catch {
+                    $Logger.LogMessage("No results were returned with the current parameters within the designated time window. Increasing timeslice.", "LOW", $null, $null)
+                    $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                    continue
+                }
+
 
                 # Check if the ResultEstimate is within expected limits.
                 # If it is, then break and proceed to log extraction process with new timeslice
@@ -633,10 +689,11 @@ Function Search-AzureCloudUnifiedLog {
             # These logs will get sort by date and the last date used as the new $StartTimeSlice value
             [System.Collections.ArrayList]$Script:ResultCumulus = @()
 
+            # ***  RETURN LARGE SET LOOP ***
             # Loop through paged results and extract all of them sequentially, before going into the next TimeSlice cycle
             # PROBLEM: the problem with this approach is that at some point Azure would start returning result indices 
             # that were not sequential and thus messing up the script. However this is the best way to export the highest
-            # amount of logs within a timespan of 30 min (considering less than that is not accepted by Azure API). So the 
+            # amount of logs within a given timespan. So the 
             # solution should be to implement a check and abort log exporting when result index stops being sequential. 
 
             while(($Script:Results.Count -ne 0) -or ($ShouldRunReturnLargeSetLoop -eq $true) -or ($NumberOfAttempts -le 3)) {
@@ -810,6 +867,11 @@ Function Search-AzureCloudUnifiedLog {
                         [System.Collections.ArrayList]$Script:ResultCumulus = @()
                     }
                     else {
+                        $Logger.LogMessage("No logs found in current timewindow. Increasing timeslice", "DEBUG", $null, $null)
+                        # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
+                        # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
+                        $TimeSlicer.IncrementTimeSlice($TimeInterval)
+                        $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
                         continue # try again
                     }
                 }
@@ -818,6 +880,9 @@ Function Search-AzureCloudUnifiedLog {
                 }
             }
         }
+    }
+    END {
+        $Logger.LogMessage("AZUREHUNTER | FINISHED EXTRACTING RECORDS", "SPECIAL", $null, $null)
     }
 }
 
