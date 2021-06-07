@@ -215,9 +215,11 @@ class Logger {
         # *** Getting a handle to the running script path so that we can refer to it *** #
         if ($MyInvocation.MyCommand.Name) { 
             $this.ScriptPath = [System.IO.DirectoryInfo]::new($(Split-Path -Parent $MyInvocation.MyCommand.Definition))
+            Write-Host $MyInvocation
+            Write-Host $MyInvocation.MyCommand.Name
         } 
         else {
-            $this.ScriptPath = [System.IO.DirectoryInfo]::new([Directory]::GetCurrentDirectory())
+            $this.ScriptPath = [System.IO.DirectoryInfo]::new($pwd)
         }
 
         $this.strTimeNow = (Get-Date).ToUniversalTime().ToString("yyMMdd-HHmmss")
