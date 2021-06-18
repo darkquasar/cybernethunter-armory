@@ -798,8 +798,10 @@ Function Search-AzureCloudUnifiedLog {
                         $Logger.LogMessage("Sorting and Deduplicating current batch Results", "LOW", $null, $null)
                         $ResultCountBeforeDedup = $Script:ResultCumulus.Count
                         $DedupedResults = $Script:ResultCumulus | Sort-Object -Property Identity -Unique
-                        $ResultCountAfterDedup = $DedupedResults.Count
+                        # For some reason when assigning to $DedupedResults PSOBJECT, the .Count property does not return a value when there's only a single record
+                        if($Script:ResultCumulus.Count -eq 1) {$ResultCountAfterDedup = 1} else {$ResultCountAfterDedup = $DedupedResults.Count}
                         $ResultCountDuplicates = $ResultCountBeforeDedup - $ResultCountAfterDedup
+
                         $Logger.LogMessage("Removed $ResultCountDuplicates Duplicate Records from current batch", "SPECIAL", $null, $null)
 
                         # SORTING by TimeStamp
@@ -809,7 +811,7 @@ Function Search-AzureCloudUnifiedLog {
                         if($AggregatedResultsFlushSize -eq 0){
                             $Logger.LogMessage("No Aggregated Results parameter configured. Exporting current batch of records to $ExportFileName", "DEBUG", $null, $null)
                             $SortedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
-                            
+
                             # Count total records so far
                             $TotalRecords = $TotalRecords + $SortedResults.Count
                             $FirstCreationDateRecord = $SortedResults[0].CreationDate
@@ -820,6 +822,7 @@ Function Search-AzureCloudUnifiedLog {
                         elseif($Script:AggregatedResults.Count -ge $AggregatedResultsFlushSize) {
 
                             # Need to add latest batch of results before exporting
+                            $Logger.LogMessage("AGGREGATED RESULTS | Reached maximum Aggregated Batch Threshold of $AggregatedResultsFlushSize", "INFO", $null, $null)
                             $Logger.LogMessage("AGGREGATED RESULTS | Adding current batch results to Aggregated Results", "SPECIAL", $null, $null)
                             $SortedResults | ForEach-Object { $Script:AggregatedResults.add($_) | Out-Null }
 
@@ -828,7 +831,7 @@ Function Search-AzureCloudUnifiedLog {
                             $AggResultCountAfterDedup = $Script:AggregatedResults.Count
                             $AggResultCountDuplicates = $AggResultCountBeforeDedup - $AggResultCountAfterDedup
                             $Logger.LogMessage("AGGREGATED RESULTS | Removed $AggResultCountDuplicates Duplicate Records from Aggregated Results", "SPECIAL", $null, $null)
-                            $Logger.LogMessage("AGGREGATED RESULTS | Exporting Aggregated Results to $ExportFileName", "SPECIAL", $null, $null)
+                            $Logger.LogMessage("AGGREGATED RESULTS | EXPORTING Aggregated Results to $ExportFileName", "SPECIAL", $null, $null)
                             $Script:AggregatedResults | Export-Csv $ExportFileName -NoTypeInformation -NoClobber -Append
 
                             # Count records so far
@@ -836,7 +839,7 @@ Function Search-AzureCloudUnifiedLog {
                             $FirstCreationDateRecord = $SortedResults[0].CreationDate
                             $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
                             # Report total records
-                            $Logger.LogMessage("Total Records exported so far: $TotalRecords ", "SPECIAL", $null, $null)
+                            $Logger.LogMessage("Total Records EXPORTED so far: $TotalRecords ", "SPECIAL", $null, $null)
 
                             # Reset $Script:AggregatedResults
                             [System.Collections.ArrayList]$Script:AggregatedResults = @()
@@ -846,14 +849,13 @@ Function Search-AzureCloudUnifiedLog {
                             $SortedResults | ForEach-Object { $Script:AggregatedResults.add($_) | Out-Null }
 
                             # Count records so far
-                            $TotalRecords = $TotalRecords + $Script:AggregatedResults.Count
+                            $TotalAggregatedBatchRecords = $Script:AggregatedResults.Count
                             $FirstCreationDateRecord = $SortedResults[0].CreationDate
                             $LastCreationDateRecord = $SortedResults[($SortedResults.Count -1)].CreationDate
                             # Report total records
-                            $Logger.LogMessage("AGGREGATED RESULTS | Total Records aggregated so far: $TotalRecords ", "SPECIAL", $null, $null)
+                            $Logger.LogMessage("AGGREGATED RESULTS | Total Records aggregated in current batch: $TotalAggregatedBatchRecords", "SPECIAL", $null, $null)
                         }
 
-                        
                         $Logger.LogMessage("TimeStamp of first received record in local time: $($FirstCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
                         $Logger.LogMessage("TimeStamp of latest received record in local time: $($LastCreationDateRecord.ToLocalTime().ToString($TimeSlicer.Culture))", "SPECIAL", $null, $null)
 
@@ -869,11 +871,13 @@ Function Search-AzureCloudUnifiedLog {
                         [System.Collections.ArrayList]$Script:ResultCumulus = @()
                     }
                     else {
-                        $Logger.LogMessage("No logs found in current timewindow. Increasing timeslice", "DEBUG", $null, $null)
+                        $Logger.LogMessage("No logs found in current timewindow. Sliding to the next timeslice", "DEBUG", $null, $null)
                         # Let's add an extra second so we avoid exporting logs that match the latest exported timestamps
                         # there is a risk we can loose a few logs by doing this, but it reduces duplicates significatively
                         $TimeSlicer.IncrementTimeSlice($TimeInterval)
                         $Logger.LogMessage("INCREMENTED TIMESLICE | Next TimeSlice in local time: [StartDate] $($TimeSlicer.StartTimeSlice.ToString($TimeSlicer.Culture)) - [EndDate] $($TimeSlicer.EndTimeSlice.ToString($TimeSlicer.Culture))", "INFO", $null, $null)
+
+                        # NOTE: We are missing here a routine to capture when $TimeSlicer.StartTimeSlice -ge $TimeSlicer.EndTime and we have results in the Aggregated Batch that have not reached the export threshold. Will need to move the exporting routine to a nested function so it can be invoked here to export the last batch before the end of the timespan.
                         continue # try again
                     }
                 }
@@ -887,4 +891,3 @@ Function Search-AzureCloudUnifiedLog {
         $Logger.LogMessage("AZUREHUNTER | FINISHED EXTRACTING RECORDS", "SPECIAL", $null, $null)
     }
 }
-
